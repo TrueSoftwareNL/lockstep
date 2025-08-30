@@ -6,7 +6,7 @@
     "main": "dist/index.js",
     "types": "dist/index.d.ts",
     "bin": {
-        "lockstep": "bin/lockstep"
+        "lockstep": "dist/cli.js"
     },
     "files": [
         "dist",
