@@ -21,7 +21,7 @@
         "build": "tsc",
         "build:watch": "tsc --watch",
         "dev": "tsx src/cli.ts",
-        "test": "vitest --run",
+        "test": "vitest run",
         "test:watch": "vitest --watch",
         "test:coverage": "vitest --coverage",
         "type-check": "tsc --noEmit",
