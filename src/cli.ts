@@ -174,11 +174,9 @@ async function main(): Promise<void> {
 // ============================================================================
 
 /**
- * Execute the CLI when this file is run directly
+ * Execute the CLI when this file is run directly or imported
  */
-if (import.meta.url === `file://${process.argv[1]}`) {
-  main().catch((error) => {
-    console.error('Unexpected error:', error);
-    process.exit(1);
-  });
-}
+main().catch((error) => {
+  console.error('Unexpected error:', error);
+  process.exit(1);
+});
