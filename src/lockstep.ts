@@ -88,9 +88,21 @@ export class Lockstep {
   private config: Required<LockstepConfig>;
 
   constructor(config: LockstepConfig = {}) {
+    // Set up basic config first
+    const root = config.root || process.cwd();
+    const packagesDirs = config.packagesDirs || ['packages'];
+    
+    // Create a temporary config for detectPackageManager
     this.config = {
-      root: config.root || process.cwd(),
-      packagesDirs: config.packagesDirs || ['packages'],
+      root,
+      packagesDirs,
+      packageManager: 'npm', // temporary default
+    };
+    
+    // Now detect package manager with proper config in place
+    this.config = {
+      root,
+      packagesDirs,
       packageManager: config.packageManager || this.detectPackageManager(),
     };
   }

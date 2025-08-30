@@ -1,66 +1,66 @@
 {
-  "name": "@blendsdk/lockstep",
-  "version": "1.0.0",
-  "description": "A comprehensive monorepo package management tool that maintains synchronized versions across all packages (lockstep versioning) with flexible CI/CD integration.",
-  "type": "module",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "bin": {
-    "lockstep": "bin/lockstep"
-  },
-  "files": [
-    "dist",
-    "bin",
-    "README.md",
-    "LICENSE"
-  ],
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "scripts": {
-    "build": "tsc",
-    "build:watch": "tsc --watch",
-    "dev": "tsx src/cli.ts",
-    "test": "vitest",
-    "test:watch": "vitest --watch",
-    "test:coverage": "vitest --coverage",
-    "type-check": "tsc --noEmit",
-    "clean": "rm -rf dist",
-    "prepublishOnly": "npm run clean && npm run build && npm test",
-    "release": "npm run prepublishOnly && npm publish"
-  },
-  "keywords": [
-    "monorepo",
-    "versioning",
-    "lockstep",
-    "release",
-    "publishing",
-    "ci-cd",
-    "conventional-commits",
-    "semantic-versioning",
-    "npm",
-    "yarn",
-    "pnpm",
-    "typescript"
-  ],
-  "author": "TrueSoftware B.V. <info@truesoftware.nl>",
-  "license": "MIT",
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/TrueSoftwareNL/lockstep.git"
-  },
-  "bugs": {
-    "url": "https://github.com/TrueSoftwareNL/lockstep/issues"
-  },
-  "homepage": "https://github.com/TrueSoftwareNL/lockstep#readme",
-  "devDependencies": {
-    "@types/node": "^20.0.0",
-    "@vitest/coverage-v8": "^1.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.0.0",
-    "vitest": "^1.0.0"
-  },
-  "publishConfig": {
-    "access": "public"
-  }
+    "name": "@blendsdk/lockstep",
+    "version": "1.0.0",
+    "description": "A comprehensive monorepo package management tool that maintains synchronized versions across all packages (lockstep versioning) with flexible CI/CD integration.",
+    "type": "module",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "bin": {
+        "lockstep": "bin/lockstep"
+    },
+    "files": [
+        "dist",
+        "bin",
+        "README.md",
+        "LICENSE"
+    ],
+    "engines": {
+        "node": ">=18.0.0"
+    },
+    "scripts": {
+        "build": "tsc",
+        "build:watch": "tsc --watch",
+        "dev": "tsx src/cli.ts",
+        "test": "vitest --run",
+        "test:watch": "vitest --watch",
+        "test:coverage": "vitest --coverage",
+        "type-check": "tsc --noEmit",
+        "clean": "rm -rf dist",
+        "prepublishOnly": "npm run clean && npm run build && npm test",
+        "release": "npm run prepublishOnly && npm publish"
+    },
+    "keywords": [
+        "monorepo",
+        "versioning",
+        "lockstep",
+        "release",
+        "publishing",
+        "ci-cd",
+        "conventional-commits",
+        "semantic-versioning",
+        "npm",
+        "yarn",
+        "pnpm",
+        "typescript"
+    ],
+    "author": "TrueSoftware B.V. <info@truesoftware.nl>",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/TrueSoftwareNL/lockstep.git"
+    },
+    "bugs": {
+        "url": "https://github.com/TrueSoftwareNL/lockstep/issues"
+    },
+    "homepage": "https://github.com/TrueSoftwareNL/lockstep#readme",
+    "devDependencies": {
+        "@types/node": "^20.0.0",
+        "@vitest/coverage-v8": "^1.0.0",
+        "tsx": "^4.0.0",
+        "typescript": "^5.0.0",
+        "vitest": "^1.0.0"
+    },
+    "publishConfig": {
+        "access": "public"
+    }
 }
