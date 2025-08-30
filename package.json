@@ -1,6 +1,6 @@
 {
     "name": "@blendsdk/lockstep",
-    "version": "1.0.4",
+    "version": "1.0.5",
     "description": "A comprehensive monorepo package management tool that maintains synchronized versions across all packages (lockstep versioning) with flexible CI/CD integration.",
     "type": "module",
     "main": "dist/index.js",
