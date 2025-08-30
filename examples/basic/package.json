@@ -1,0 +1,19 @@
+{
+  "name": "my-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "turbo run build",
+    "test": "turbo run test",
+    "lint": "turbo run lint",
+    "version": "lockstep version --type auto --ci",
+    "publish": "lockstep publish --tag latest --git-push"
+  },
+  "devDependencies": {
+    "@blendsdk/lockstep": "^1.0.0",
+    "turbo": "^2.0.0"
+  }
+}

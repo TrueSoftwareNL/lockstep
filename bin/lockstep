@@ -1,0 +1,8 @@
+#!/usr/bin/env node
+
+/**
+ * Executable entry point for the Lockstep CLI
+ * This file imports and runs the CLI from the compiled JavaScript
+ */
+
+import '../dist/cli.js';
