@@ -1,4 +1,4 @@
-# @blendsdk/lockstep
+# LockStep
 
 A comprehensive monorepo package management tool that maintains synchronized versions across all packages (lockstep versioning) with flexible CI/CD integration.
 
