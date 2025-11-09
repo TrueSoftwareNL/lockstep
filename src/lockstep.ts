@@ -118,7 +118,7 @@ export class Lockstep {
       if (!exists(dirPath)) return;
 
       for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
-        if (entry.isDirectory()) {
+        if (entry.isDirectory() && && entry.name !== 'node_modules') {
           const entryPath = path.join(dirPath, entry.name);
           const pkgPath = path.join(entryPath, 'package.json');
 
