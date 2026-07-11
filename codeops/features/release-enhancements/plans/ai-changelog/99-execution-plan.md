@@ -2,8 +2,8 @@
 
 > **Document**: 99-execution-plan.md
 > **Parent**: [Index](00-index.md)
-> **Last Updated**: 2026-07-12 00:54
-> **Progress**: 0/26 tasks (0%)
+> **Last Updated**: 2026-07-12 01:00
+> **Progress**: 7/26 tasks (27%)
 > **CodeOps Skills Version**: 3.3.2
 
 ## Overview
@@ -37,19 +37,19 @@ docs. The pipeline never blocks a release; SDKs are optional and dynamically imp
 
 ### Step 1.1: Specification tests (BEFORE implementation)
 **Reference**: `07-testing-strategy.md` ST-1…9 · AR PA-3
-- [ ] 1.1.1 Write spec tests for `parseConventionalCommit`, `getLastReleaseRef`, `getCommitsSinceRef` (body capture), `attributeCommitToPackages`, `buildPackageChangeSummary` over a temp git fixture — `src/changelog/change-detection.spec.test.ts`
-- [ ] 1.1.2 Run — verify FAIL (red phase)
+- [x] 1.1.1 Write spec tests for `parseConventionalCommit`, `getLastReleaseRef`, `getCommitsSinceRef` (body capture), `attributeCommitToPackages`, `buildPackageChangeSummary` over a temp git fixture — `src/changelog/change-detection.spec.test.ts` ✅ (completed: 2026-07-12 00:58)
+- [x] 1.1.2 Run — verify FAIL (red phase) ✅ (completed: 2026-07-12 00:58) — suite fails on missing module; correct red state
 
 ### Step 1.2: Implementation
 **Reference**: `03-01-change-detection.md`
-- [ ] 1.2.1 Add `ParsedCommit`, `PackageChangeSummary`, `ChangelogOptions` — `src/changelog/types.ts`
-- [ ] 1.2.2 Implement `src/changelog/change-detection.ts` (base ref, changed files, conventional parse incl. body, generic scope+file attribution, summary assembly)
-- [ ] 1.2.3 Run spec tests — verify PASS (green); fix implementation, never the test
+- [x] 1.2.1 Add `ParsedCommit`, `PackageChangeSummary`, `ChangelogOptions` — `src/changelog/types.ts` ✅ (completed: 2026-07-12 00:59)
+- [x] 1.2.2 Implement `src/changelog/change-detection.ts` (base ref, changed files, conventional parse incl. body, generic scope+file attribution, summary assembly) ✅ (completed: 2026-07-12 00:59)
+- [x] 1.2.3 Run spec tests — verify PASS (green); fix implementation, never the test ✅ (completed: 2026-07-12 00:59) — 46/46 pass
 
 ### Step 1.3: Implementation tests & hardening
 **Reference**: `07-testing-strategy.md` §Impl Tests
-- [ ] 1.3.1 Write impl tests: no-tags bootstrap, non-conventional-only history, multi-package attribution ties — `src/changelog/change-detection.impl.test.ts`
-- [ ] 1.3.2 Full verification
+- [x] 1.3.1 Write impl tests: no-tags bootstrap, non-conventional-only history, multi-package attribution ties — `src/changelog/change-detection.impl.test.ts` ✅ (completed: 2026-07-12 01:00)
+- [x] 1.3.2 Full verification ✅ (completed: 2026-07-12 01:00) — 50/50 pass, type-check clean
 
 **Verify**: `npm run type-check && npm test`
 
