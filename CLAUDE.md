@@ -12,9 +12,7 @@
 ## Toolchain
 - **Language(s):** TypeScript (ESM — source uses `.js` import specifiers; `type: module`)
 - **Framework(s):** none (Node.js CLI + library; Node >= 18)
-- **Package manager:** npm (only `package-lock.json` is present; scripts and CI use `npm`).
-  <!-- TODO: the package.json `packageManager` field pins yarn@1.22.22 but no yarn.lock exists and
-       everything runs on npm — reconcile or drop the stale field. -->
+- **Package manager:** npm (`package-lock.json`, `packageManager: npm@10.9.2`; scripts and CI use `npm`).
 - **Test framework:** vitest (v8 coverage); config in `vitest.config.ts`
 
 ## Commands
