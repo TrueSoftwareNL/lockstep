@@ -8,6 +8,12 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { buildPackageChangeSummary } from "./changelog/change-detection.js";
+import { writeOrUpdateChangelog } from "./changelog/changelog-writer.js";
+import { createLLMConfig, LLMProvider } from "./changelog/llm-provider.js";
+import { buildChangelogPrompt, buildReleaseNotesPrompt } from "./changelog/prompts.js";
+import { writeReleaseNotes } from "./changelog/release-notes-writer.js";
+import type { ChangelogOptions } from "./changelog/types.js";
 import { buildPublishCommand, planProvenance, provenanceLogLine } from "./provenance.js";
 import type {
     BumpType,
@@ -71,6 +77,18 @@ function exists(p: string): boolean {
  */
 function git(cmd: string): string {
     return execSync(`git ${cmd}`, { stdio: "pipe" }).toString().trim();
+}
+
+/**
+ * Returns today's date as a local YYYY-MM-DD string, used to stamp changelog entries.
+ * @returns The formatted date
+ */
+function todayDate(): string {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
 }
 
 // ============================================================================
@@ -518,5 +536,89 @@ export class Lockstep {
             execSync("git push --follow-tags", { stdio: "inherit" });
             console.log("✔ Git changes and tags pushed to remote");
         }
+    }
+
+    /**
+     * Creates the LLM provider used for changelog generation. Isolated so tests can substitute a
+     * stub provider without configuring real API keys.
+     * @returns A provider built from environment configuration
+     */
+    protected createChangelogProvider(): LLMProvider {
+        return new LLMProvider(createLLMConfig());
+    }
+
+    /**
+     * Generates a per-package `CHANGELOG.md` and a root `RELEASE_NOTES.md` for the current release.
+     *
+     * Detects which packages changed since the last release tag, attributes commits to packages,
+     * asks the LLM to write each entry, and writes the files. It never throws on an expected
+     * failure: with no API key or on any provider error it writes deterministic fallback entries so
+     * a release always has a changelog.
+     *
+     * @param options - Dry-run and verbose switches
+     *
+     * @example
+     * await lockstep.changelog();                 // write changelog + release notes
+     * await lockstep.changelog({ dryRun: true });  // preview only, write nothing
+     */
+    async changelog(options: ChangelogOptions = {}): Promise<void> {
+        const { dryRun = false, verbose = false } = options;
+
+        const { packages } = this.buildWorkspace();
+        const version = this.ensureAllSameVersion(packages);
+        const date = todayDate();
+
+        const summaries = buildPackageChangeSummary(this.config.root, packages);
+        if (summaries.length === 0) {
+            console.log("No package changes detected since the last release; nothing to generate.");
+            return;
+        }
+
+        const provider = this.createChangelogProvider();
+        const available = provider.getAvailableProviders();
+        if (available.length === 0) {
+            console.warn("No LLM API keys configured; writing fallback changelog entries.");
+        } else if (verbose) {
+            console.log(`LLM providers available: ${available.join(", ")}`);
+        }
+
+        let tokensIn = 0;
+        let tokensOut = 0;
+
+        // Per-package changelog entries.
+        for (const summary of summaries) {
+            const { system, user } = buildChangelogPrompt(summary);
+            const result = await provider.generate(system, user);
+            if (result) {
+                tokensIn += result.tokensUsed.input;
+                tokensOut += result.tokensUsed.output;
+            }
+            const content = result?.content ?? "";
+
+            if (dryRun) {
+                console.log(`[dry-run] ${summary.packageName} CHANGELOG:\n${content || "(fallback entry)"}`);
+            } else {
+                writeOrUpdateChangelog(summary.packageDir, version, date, content);
+                if (verbose) console.log(`✔ ${summary.packageName} -> ${summary.packagePath}/CHANGELOG.md`);
+            }
+        }
+
+        // Root non-technical release notes.
+        const notes = buildReleaseNotesPrompt(version, summaries);
+        const notesResult = await provider.generate(notes.system, notes.user);
+        if (notesResult) {
+            tokensIn += notesResult.tokensUsed.input;
+            tokensOut += notesResult.tokensUsed.output;
+        }
+        const notesContent = notesResult?.content ?? "";
+
+        if (dryRun) {
+            console.log(`[dry-run] RELEASE_NOTES:\n${notesContent || "(placeholder)"}`);
+        } else {
+            writeReleaseNotes(this.config.root, version, date, notesContent);
+            if (verbose) console.log("✔ RELEASE_NOTES.md");
+        }
+
+        if (verbose) console.log(`Changelog tokens: ~${tokensIn} in, ~${tokensOut} out`);
     }
 }
