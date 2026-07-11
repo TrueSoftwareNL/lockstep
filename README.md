@@ -99,6 +99,7 @@ lockstep publish --tag <dist-tag> [options]
 - `--access <public|restricted>` - NPM access level (default: public)
 - `--dry` - Perform a dry run without publishing
 - `--git-push` - Push git changes and tags after publish
+- `--provenance` - Generate npm provenance attestations (requires supported CI)
 
 **Examples:**
 ```bash
@@ -107,6 +108,7 @@ lockstep publish --tag alpha
 lockstep publish --tag beta --dry
 lockstep publish --tag latest --access restricted
 lockstep publish --tag alpha --git-push
+lockstep publish --tag latest --provenance
 ```
 
 ## Automatic Version Detection
@@ -136,6 +138,30 @@ lockstep publish --tag latest    # → publishes as "latest"
 # On feature-branch
 lockstep publish --tag alpha     # → publishes as "feature-branch-alpha"
 ```
+
+## npm Provenance
+
+[npm provenance](https://docs.npmjs.com/generating-provenance-statements) attaches a signed,
+publicly verifiable record linking each published package to the source commit and CI build that
+produced it. Enable it with `--provenance`:
+
+```bash
+lockstep publish --tag latest --provenance
+```
+
+Provenance is opt-in and has requirements enforced by npm:
+
+- **Supported CI only.** It works exclusively from GitHub Actions or GitLab CI on a cloud-hosted
+  runner. Outside a supported CI, lockstep prints a warning and publishes **without** provenance
+  rather than failing — a local `--provenance` never blocks the publish.
+- **`repository` field required.** Every package that publishes with provenance must declare a
+  `repository` field in its `package.json`. Lockstep validates this **before** publishing anything
+  and aborts the whole run if a provenance-enabled package is missing it, so a partial publish can't
+  strand the monorepo.
+- **OIDC permission.** In GitHub Actions the job needs `permissions: id-token: write`.
+
+A single package can also opt in via `"publishConfig": { "provenance": true }` in its
+`package.json`, independent of the flag.
 
 ## Configuration
 
@@ -202,6 +228,7 @@ jobs:
     permissions:
       contents: write
       packages: write
+      id-token: write   # required for npm provenance
     steps:
       - uses: actions/checkout@v4
         with:
@@ -220,7 +247,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish packages
-        run: lockstep publish --tag latest --git-push
+        run: lockstep publish --tag latest --git-push --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```

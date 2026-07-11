@@ -8,6 +8,7 @@
 import { execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
+import { buildPublishCommand, planProvenance, provenanceLogLine } from "./provenance.js";
 import type {
     BumpType,
     DependencyField,
@@ -457,7 +458,7 @@ export class Lockstep {
      * @param options - Publishing options including access, dry run, tag, and git push
      */
     async publish(options: PublishOptions): Promise<void> {
-        const { access = "public", dry = false, tag, gitPush = false } = options;
+        const { access = "public", dry = false, tag, gitPush = false, provenance = false } = options;
 
         if (!tag) {
             throw new Error("--tag parameter is required for publish command");
@@ -466,6 +467,20 @@ export class Lockstep {
         const { packages, graph } = this.buildWorkspace();
         const order = this.topoSort(packages, graph); // Ensure dependencies publish first
         console.log("Publish order:", order.join(" -> "));
+
+        // Resolve provenance up front: detect the CI, decide which packages get attestation, and
+        // validate their repository fields before anything is published — a missing field aborts
+        // the whole run rather than stranding half the monorepo on the registry.
+        const provenancePlan = planProvenance(packages, { flag: provenance, env: process.env });
+        const provenanceLine = provenanceLogLine(provenancePlan);
+        if (provenanceLine) console.log(provenanceLine);
+
+        if (provenancePlan.effective && provenancePlan.missingRepository.length > 0) {
+            throw new Error(
+                `--provenance requires a "repository" field in package.json. Missing in: ` +
+                    provenancePlan.missingRepository.join(", ")
+            );
+        }
 
         // Create branch-prefixed dist-tag (except for 'latest')
         const currentBranch = git("rev-parse --abbrev-ref HEAD");
@@ -485,22 +500,14 @@ export class Lockstep {
                 throw new Error(`Package ${name} not found in workspace`);
             }
 
-            // Build publish command arguments
-            const args: string[] = [];
-            args.push("--access", access);
-            args.push("--tag", finalTag);
-
-            // Generate appropriate publish command for package manager
-            let cmd: string;
-            if (this.config.packageManager === "pnpm") {
-                cmd = `pnpm publish ${args.join(" ")} ${dry ? "--dry-run" : ""}`;
-            } else if (this.config.packageManager === "yarn") {
-                // Yarn uses npm publish under the hood
-                cmd = `npm publish ${args.join(" ")} ${dry ? "--dry-run" : ""}`;
-            } else {
-                // Default to npm
-                cmd = `npm publish ${args.join(" ")} ${dry ? "--dry-run" : ""}`;
-            }
+            // pnpm publishes with its own CLI; npm and yarn both publish via `npm publish`.
+            // Provenance is applied only to the packages the plan enabled.
+            const cmd = buildPublishCommand(this.config.packageManager, {
+                access,
+                tag: finalTag,
+                provenance: provenancePlan.effective && provenancePlan.enabledPackages.has(name),
+                dry
+            });
 
             execSync(cmd, { cwd: p.dir, stdio: "inherit" });
         }

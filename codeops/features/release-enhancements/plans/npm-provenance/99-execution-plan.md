@@ -2,8 +2,8 @@
 
 > **Document**: 99-execution-plan.md
 > **Parent**: [Index](00-index.md)
-> **Last Updated**: 2026-07-12 00:11
-> **Progress**: 0/12 tasks (0%)
+> **Last Updated**: 2026-07-12 00:24
+> **Progress**: 12/12 tasks (100%)
 > **CodeOps Skills Version**: 3.3.2
 
 ## Overview
@@ -48,8 +48,8 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `07-testing-strategy.md` ST-1, ST-2/2b, ST-3, ST-4, ST-4i, ST-5, ST-6a/b, ST-7c, ST-8a–c, ST-9, ST-10, ST-11a–d · AR PA-2
 **Objective**: Encode expected behavior of the pure helpers before they exist.
 
-- [ ] 1.1.1 Write spec tests for `detectSupportedCI`, `planProvenance`, `buildPublishCommand`, `provenanceLogLine` from the ST-cases — `src/provenance.spec.test.ts` (MUST NOT read implementation; helpers do not exist yet)
-- [ ] 1.1.2 Run spec tests — verify they FAIL (red phase); document any pre-passing case
+- [x] 1.1.1 Write spec tests for `detectSupportedCI`, `planProvenance`, `buildPublishCommand`, `provenanceLogLine` from the ST-cases — `src/provenance.spec.test.ts` (MUST NOT read implementation; helpers do not exist yet) ✅ (completed: 2026-07-12 00:16)
+- [x] 1.1.2 Run spec tests — verify they FAIL (red phase); document any pre-passing case ✅ (completed: 2026-07-12 00:16) — suite fails on missing `./provenance.js` (helpers absent); correct red state
 
 **Deliverables**:
 - [ ] `src/provenance.spec.test.ts` covering the Phase-1 ST-cases, failing for the right reason
@@ -61,9 +61,9 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `03-01-provenance-publish.md` §Implementation Details · AR #5, #6, #7, #14, PA-3
 **Objective**: Implement the pure decision layer to satisfy the spec tests.
 
-- [ ] 1.2.1 Add `provenance?: boolean` to `PublishOptions` and typed `publishConfig?: { provenance?: boolean; access?: string }` to `PackageJson` — `src/types.ts`
-- [ ] 1.2.2 Implement `detectSupportedCI`, `planProvenance`, `buildPublishCommand`, `provenanceLogLine` (pure; env passed in) — `src/provenance.ts`
-- [ ] 1.2.3 Run spec tests — verify they PASS (green phase); if any fails, fix the implementation, never the test
+- [x] 1.2.1 Add `provenance?: boolean` to `PublishOptions` and typed `publishConfig?: { provenance?: boolean; access?: string }` to `PackageJson` — `src/types.ts` ✅ (completed: 2026-07-12 00:17)
+- [x] 1.2.2 Implement `detectSupportedCI`, `planProvenance`, `buildPublishCommand`, `provenanceLogLine` (pure; env passed in) — `src/provenance.ts` ✅ (completed: 2026-07-12 00:17)
+- [x] 1.2.3 Run spec tests — verify they PASS (green phase); if any fails, fix the implementation, never the test ✅ (completed: 2026-07-12 00:17) — 29/29 tests pass, type-check clean
 
 **Deliverables**:
 - [ ] `src/provenance.ts` with all four exported helpers documented (JSDoc + `@example` on public API)
@@ -76,8 +76,8 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `07-testing-strategy.md` §Implementation Tests
 **Objective**: Cover edges and internals of the pure layer.
 
-- [ ] 1.3.1 Write impl tests: empty publish set; both CI vars set (github wins); `publishConfig.provenance:false` off; access passthrough; dry builds `--dry-run` — `src/provenance.impl.test.ts`
-- [ ] 1.3.2 Full verification
+- [x] 1.3.1 Write impl tests: empty publish set; both CI vars set (github wins); `publishConfig.provenance:false` off; access passthrough; dry builds `--dry-run` — `src/provenance.impl.test.ts` ✅ (completed: 2026-07-12 00:18)
+- [x] 1.3.2 Full verification ✅ (completed: 2026-07-12 00:18) — 34/34 tests pass, type-check clean
 
 **Deliverables**:
 - [ ] `src/provenance.impl.test.ts` green; no regression in `src/lockstep.test.ts`
@@ -93,8 +93,8 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `07-testing-strategy.md` ST-4i · AR #7
 **Objective**: Encode the throw-before-loop guarantee at the `publish()` level.
 
-- [ ] 2.1.1 Write spec test ST-4i: `publish()` on a fixture workspace (in a supported-CI env) with a provenance-enabled package missing `repository` throws before any publish runs — add to `src/provenance.spec.test.ts`
-- [ ] 2.1.2 Run — verify it FAILS (red phase; `publish()` not yet wired)
+- [x] 2.1.1 Write spec test ST-4i: `publish()` on a fixture workspace (in a supported-CI env) with a provenance-enabled package missing `repository` throws before any publish runs — add to `src/provenance.spec.test.ts` ✅ (completed: 2026-07-12 00:20)
+- [x] 2.1.2 Run — verify it FAILS (red phase; `publish()` not yet wired) ✅ (completed: 2026-07-12 00:20) — publish resolves instead of rejecting; correct red state
 
 **Deliverables**:
 - [ ] ST-4i spec test present and failing for the right reason
@@ -106,9 +106,9 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `03-01-provenance-publish.md` §Integration Points · AR #5, #6, #7
 **Objective**: Wire the decision layer into publish + CLI; keep no-flag behavior unchanged.
 
-- [ ] 2.2.1 Rewire `publish()`: call `planProvenance` once, log `provenanceLogLine`, throw before the loop on `missingRepository`, build each command via `buildPublishCommand` with per-package provenance — `src/lockstep.ts`
-- [ ] 2.2.2 Parse `--provenance` into `PublishOptions` and add it to the help text — `src/cli.ts`
-- [ ] 2.2.3 Run spec tests — verify green (ST-4i passes; ST-1 baseline unchanged)
+- [x] 2.2.1 Rewire `publish()`: call `planProvenance` once, log `provenanceLogLine`, throw before the loop on `missingRepository`, build each command via `buildPublishCommand` with per-package provenance — `src/lockstep.ts` ✅ (completed: 2026-07-12 00:22)
+- [x] 2.2.2 Parse `--provenance` into `PublishOptions` and add it to the help text — `src/cli.ts` ✅ (completed: 2026-07-12 00:22)
+- [x] 2.2.3 Run spec tests — verify green (ST-4i passes; ST-1 baseline unchanged) ✅ (completed: 2026-07-12 00:22) — 35/35 tests pass, type-check clean
 
 **Deliverables**:
 - [ ] `publish()` uses the pure helpers; `--provenance` reaches `PublishOptions`; help documents it
@@ -120,8 +120,8 @@ integration spec (throw-before-loop), and updates docs. Specification-first orde
 **Reference**: `01-requirements.md` AC2 (baseline equality) · `07-testing-strategy.md` §Integration
 **Objective**: Document the flag and confirm no behavioral regression.
 
-- [ ] 2.3.1 Document `--provenance` in `README.md` (usage, supported-CI requirement, `repository` requirement, `publishConfig.provenance`) and add a baseline-equality integration assertion to `src/provenance.impl.test.ts`
-- [ ] 2.3.2 Full verification
+- [x] 2.3.1 Document `--provenance` in `README.md` (usage, supported-CI requirement, `repository` requirement, `publishConfig.provenance`) and add a baseline-equality integration assertion to `src/provenance.impl.test.ts` ✅ (completed: 2026-07-12 00:24)
+- [x] 2.3.2 Full verification ✅ (completed: 2026-07-12 00:24) — 36/36 tests pass, type-check clean, CLI help verified
 
 **Deliverables**:
 - [ ] README documents provenance; baseline command equality asserted; all tests green

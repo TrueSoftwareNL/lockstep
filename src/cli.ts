@@ -62,6 +62,7 @@ PUBLISH OPTIONS:
   --access <public|restricted>     NPM access level (default: public)
   --dry                            Perform a dry run without publishing
   --git-push                       Push git changes and tags after publish
+  --provenance                     Generate npm provenance (requires GitHub Actions or GitLab CI)
 
 EXAMPLES:
   lockstep version --type patch
@@ -75,6 +76,7 @@ EXAMPLES:
   lockstep publish --tag beta --dry
   lockstep publish --tag latest --access restricted
   lockstep publish --tag alpha --git-push
+  lockstep publish --tag latest --provenance
 
 NOTES:
   • --type auto analyzes conventional commits to determine version bump:
@@ -86,8 +88,12 @@ NOTES:
     Example: 'alpha' on 'feature-branch' becomes 'feature-branch-alpha'
   
   • Package manager detection: Automatically detects npm, yarn, or pnpm
-  
+
   • Lockstep versioning: All packages maintain the same version number
+
+  • --provenance: Generates npm provenance attestations. Requires a supported CI
+    (GitHub Actions or GitLab CI) with id-token permission, and a "repository"
+    field in each package.json. Outside supported CI it is skipped with a warning.
 
 For more information, visit: https://github.com/TrueSoftwareNL/lockstep
 `);
@@ -150,12 +156,13 @@ async function main(): Promise<void> {
       const dry = Boolean(opts.dry);
       const tag = opts.tag === true ? '' : String(opts.tag || '');
       const gitPush = Boolean(opts['git-push']);
+      const provenance = Boolean(opts.provenance);
 
       if (!tag) {
         throw new Error('--tag parameter is required for publish command');
       }
 
-      await lockstep.publish({ access, dry, tag, gitPush });
+      await lockstep.publish({ access, dry, tag, gitPush, provenance });
       
     } else {
       console.error(`Unknown command: ${cmd}`);

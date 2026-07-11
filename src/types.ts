@@ -15,6 +15,10 @@ export interface PackageJson {
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
   optionalDependencies?: Record<string, string>;
+  /** Source repository. npm matches this against the build origin when attaching provenance. */
+  repository?: string | { type?: string; url?: string; directory?: string };
+  /** npm publish overrides; `provenance` opts an individual package into attestation. */
+  publishConfig?: { provenance?: boolean; access?: string };
   [key: string]: any;
 }
 
@@ -58,6 +62,8 @@ export interface PublishOptions {
   tag: string;
   /** Whether to push git changes after publish */
   gitPush?: boolean;
+  /** Enable npm provenance attestation (requires a supported CI environment) */
+  provenance?: boolean;
 }
 
 /**
