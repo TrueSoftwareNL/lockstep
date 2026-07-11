@@ -76,6 +76,8 @@ export interface VersionOptions {
   skipCi?: boolean;
   /** Whether to skip git operations entirely */
   noGitCommit?: boolean;
+  /** Whether to skip AI changelog generation during the version bump */
+  noChangelog?: boolean;
 }
 
 /**

@@ -8,6 +8,8 @@ A comprehensive monorepo package management tool that maintains synchronized ver
 - **Dependency-Aware Publishing**: Uses topological sorting to publish dependencies first
 - **Branch-Based Dist-Tags**: Automatic prefixing based on git branch
 - **Conventional Commits**: Automatic version detection from commit messages
+- **AI Changelog & Release Notes**: LLM-drafted per-package `CHANGELOG.md` and root `RELEASE_NOTES.md`
+- **npm Provenance**: Signed, verifiable build attestations from supported CI
 - **CI Integration**: Skip CI loops and flexible git operations
 - **Package Manager Detection**: Works with npm, yarn, and pnpm
 - **TypeScript Support**: Full type definitions included
@@ -76,6 +78,7 @@ lockstep version --type <patch|minor|major|auto> [options]
 - `--type <patch|minor|major|auto>` - Type of version bump (required)
 - `--ci` - Add [skip ci] to commit message
 - `--no-git-commit` - Skip git commit and tag operations
+- `--no-changelog` - Skip AI changelog generation during the bump
 
 **Examples:**
 ```bash
@@ -84,6 +87,30 @@ lockstep version --type minor --ci
 lockstep version --type major --no-git-commit
 lockstep version --type auto
 lockstep version --type auto --ci
+lockstep version --type patch --no-changelog
+```
+
+By default a version bump also generates changelog and release-notes files and folds them into the
+release commit. See [AI Changelog & Release Notes](#ai-changelog--release-notes) below.
+
+### Changelog Command
+
+Generates a per-package `CHANGELOG.md` and a root `RELEASE_NOTES.md` for the current release,
+without bumping any versions. Useful for previewing notes or regenerating them on demand.
+
+```bash
+lockstep changelog [options]
+```
+
+**Options:**
+- `--dry-run` - Print what would be generated; write nothing
+- `--verbose` - Print detailed progress and token usage
+
+**Examples:**
+```bash
+lockstep changelog
+lockstep changelog --dry-run
+lockstep changelog --verbose
 ```
 
 ### Publish Command
@@ -138,6 +165,51 @@ lockstep publish --tag latest    # → publishes as "latest"
 # On feature-branch
 lockstep publish --tag alpha     # → publishes as "feature-branch-alpha"
 ```
+
+## AI Changelog & Release Notes
+
+Lockstep can write your changelog for you. It inspects the conventional commits since the last
+release tag, attributes each commit to the package(s) it touched, and asks an LLM to draft the
+entries — producing a [Keep a Changelog](https://keepachangelog.com/)-style `CHANGELOG.md` per
+package plus a reader-friendly `RELEASE_NOTES.md` at the repo root.
+
+Generation runs automatically during `lockstep version` (opt out with `--no-changelog`), or on
+demand via `lockstep changelog`.
+
+### Providers and configuration
+
+The SDKs are **optional dependencies** — install whichever provider you use:
+
+```bash
+npm install openai            # OpenAI (primary)
+npm install @anthropic-ai/sdk # Anthropic (fallback)
+```
+
+Configure via environment variables:
+
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `OPENAI_API_KEY` | Enables the OpenAI provider (tried first) | — |
+| `ANTHROPIC_API_KEY` | Enables the Anthropic provider (fallback) | — |
+| `LOCKSTEP_OPENAI_MODEL` | Override the OpenAI model | `gpt-4o-mini` |
+| `LOCKSTEP_ANTHROPIC_MODEL` | Override the Anthropic model | `claude-haiku-4-5-20251001` |
+
+OpenAI is tried first; if it is unavailable or errors, Anthropic is used.
+
+### Never blocks a release
+
+Changelog generation is best-effort and is designed to never stop a release:
+
+- **No API key / SDK not installed** → deterministic fallback entries are written (a plain
+  version-bump note), and the release continues.
+- **Provider error** → the same fallback path is taken.
+- **A `version`-triggered failure** degrades to a warning; the bump, commit, and tag still complete.
+
+### Privacy
+
+Only commit **metadata** is sent to the LLM — commit subjects/types, scopes, and changed file
+**paths** (capped). File **contents** and diffs are never transmitted, and API keys are never
+logged or written to any generated file.
 
 ## npm Provenance
 

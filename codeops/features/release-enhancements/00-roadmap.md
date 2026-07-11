@@ -3,8 +3,8 @@
 > **Feature-Set**: Release Enhancements
 > **Status**: In Progress
 > **Created**: 2026-07-12
-> **Last Updated**: 2026-07-12 00:56
-> **Progress**: 1 / 3 (33%)
+> **Last Updated**: 2026-07-12 01:41
+> **Progress**: 2 / 3 (67%)
 > **CodeOps Skills Version**: 3.3.2
 
 ## Legend
@@ -15,7 +15,7 @@
 
 | ID | Title | RD | Plan | Stage | Status | Last Updated | Notes / Blocker |
 |----|-------|----|------|-------|--------|--------------|-----------------|
-| RD-01 | AI-Based Changelog & Release Notes | [RD-01](requirements/RD-01-ai-changelog.md) | [ai-changelog](plans/ai-changelog/00-index.md) | Executing | 🔄 | 2026-07-12 | Implementing (26 tasks) |
+| RD-01 | AI-Based Changelog & Release Notes | [RD-01](requirements/RD-01-ai-changelog.md) | [ai-changelog](plans/ai-changelog/00-index.md) | Done | ✅ | 2026-07-12 | Implemented + tested (26 tasks, 78 tests) |
 | RD-02 | npm Provenance Support | [RD-02](requirements/RD-02-npm-provenance.md) | [npm-provenance](plans/npm-provenance/00-index.md) | Done | ✅ | 2026-07-12 | Implemented + tested (36 tests) |
 | RD-03 | Non-Functional & Security | [RD-03](requirements/RD-03-non-functional.md) | — | RD Drafted | ✏️ | 2026-07-12 | Shared contract for RD-01/RD-02 |
 
@@ -25,3 +25,8 @@
   order RD-02 → RD-01; RD-03 is the cross-cutting contract verified within each feature's tests.
 - 2026-07-12: RD-02 (npm provenance) implemented and verified — new `src/provenance.ts` pure
   decision layer + `--provenance` publish flag; 36 tests pass, type-check clean.
+- 2026-07-12: RD-01 (AI changelog) implemented and verified — new `src/changelog/` module
+  (change-detection, OpenAI→Anthropic provider, prompts, writers), `changelog` command,
+  auto-run in `version` (opt-out via `--no-changelog`), optional SDK deps; 78 tests pass,
+  type-check clean. Execution also fixed a latent git working-directory bug (PA-5): all git
+  operations now run against the configured repository root.

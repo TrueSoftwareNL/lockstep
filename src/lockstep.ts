@@ -71,12 +71,15 @@ function exists(p: string): boolean {
 }
 
 /**
- * Executes a git command and returns the output
+ * Executes a git command in the given working directory and returns the output.
+ * The `cwd` is passed explicitly so operations always target the configured repository
+ * root rather than whatever directory the process happens to be launched from.
  * @param cmd - Git command to execute (without 'git' prefix)
+ * @param cwd - Working directory the command runs in
  * @returns Command output as trimmed string
  */
-function git(cmd: string): string {
-    return execSync(`git ${cmd}`, { stdio: "pipe" }).toString().trim();
+function git(cmd: string, cwd: string): string {
+    return execSync(`git ${cmd}`, { cwd, stdio: "pipe" }).toString().trim();
 }
 
 /**
@@ -308,13 +311,13 @@ export class Lockstep {
     changedSinceLastTag(): boolean {
         let lastTag = "";
         try {
-            lastTag = git("describe --tags --abbrev=0");
+            lastTag = git("describe --tags --abbrev=0", this.config.root);
         } catch {
             // No tags exist, assume changes
             return true;
         }
 
-        const diff = execSync(`git diff --name-only ${lastTag}..HEAD`, { stdio: "pipe" }).toString();
+        const diff = execSync(`git diff --name-only ${lastTag}..HEAD`, { cwd: this.config.root, stdio: "pipe" }).toString();
         return diff.split("\n").some(Boolean);
     }
 
@@ -325,7 +328,7 @@ export class Lockstep {
     determineVersionType(): Exclude<BumpType, "auto"> {
         let lastTag = "";
         try {
-            lastTag = git("describe --tags --abbrev=0");
+            lastTag = git("describe --tags --abbrev=0", this.config.root);
         } catch {
             // No tags exist, default to patch
             console.log("No previous tags found, defaulting to patch version bump");
@@ -335,7 +338,7 @@ export class Lockstep {
         // Get commit messages since last tag
         let commits: string;
         try {
-            commits = git(`log ${lastTag}..HEAD --pretty=format:"%s"`);
+            commits = git(`log ${lastTag}..HEAD --pretty=format:"%s"`, this.config.root);
         } catch {
             console.log("Unable to get commit history, defaulting to patch version bump");
             return "patch";
@@ -407,7 +410,7 @@ export class Lockstep {
      * @param options - Version options including type, skipCi, and noGitCommit
      */
     async version(options: VersionOptions): Promise<void> {
-        const { type, skipCi = false, noGitCommit = false } = options;
+        const { type, skipCi = false, noGitCommit = false, noChangelog = false } = options;
 
         // If auto is specified, determine the actual version type
         const actualType = type === "auto" ? this.determineVersionType() : type;
@@ -458,12 +461,23 @@ export class Lockstep {
             }
         }
 
+        // Generate the changelog into the release commit, unless opted out. A changelog failure
+        // must never abort a release that already succeeded, so any error degrades to a warning.
+        if (!noChangelog) {
+            try {
+                await this.changelog({});
+            } catch (error) {
+                const detail = error instanceof Error ? error.message : String(error);
+                console.warn(`Changelog generation failed, continuing release: ${detail}`);
+            }
+        }
+
         // Perform git operations unless explicitly skipped
         if (!noGitCommit) {
-            execSync(`git add .`, { stdio: "inherit" });
+            execSync(`git add .`, { cwd: this.config.root, stdio: "inherit" });
             const commitMessage = `chore(release): v${next}${skipCi ? " [skip ci]" : ""}`;
-            execSync(`git commit -m "${commitMessage}"`, { stdio: "inherit" });
-            execSync(`git tag v${next}`, { stdio: "inherit" });
+            execSync(`git commit -m "${commitMessage}"`, { cwd: this.config.root, stdio: "inherit" });
+            execSync(`git tag v${next}`, { cwd: this.config.root, stdio: "inherit" });
 
             console.log(`\nAll packages bumped to v${next} and tagged.`);
         } else {
@@ -501,7 +515,7 @@ export class Lockstep {
         }
 
         // Create branch-prefixed dist-tag (except for 'latest')
-        const currentBranch = git("rev-parse --abbrev-ref HEAD");
+        const currentBranch = git("rev-parse --abbrev-ref HEAD", this.config.root);
         const finalTag = tag === "latest" ? "latest" : `${currentBranch}-${tag}`;
 
         console.log(`Publishing with dist-tag: ${finalTag}`);
@@ -533,7 +547,7 @@ export class Lockstep {
         // Push git changes and tags if requested (and not in dry run)
         if (gitPush && !dry) {
             console.log("\nPushing git changes and tags...");
-            execSync("git push --follow-tags", { stdio: "inherit" });
+            execSync("git push --follow-tags", { cwd: this.config.root, stdio: "inherit" });
             console.log("✔ Git changes and tags pushed to remote");
         }
     }

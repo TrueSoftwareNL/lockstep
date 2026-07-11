@@ -2,8 +2,8 @@
 
 > **Document**: 99-execution-plan.md
 > **Parent**: [Index](00-index.md)
-> **Last Updated**: 2026-07-12 01:10
-> **Progress**: 20/26 tasks (77%)
+> **Last Updated**: 2026-07-12 01:41
+> **Progress**: 26/26 tasks (100%)
 > **CodeOps Skills Version**: 3.3.2
 
 ## Overview
@@ -100,20 +100,27 @@ docs. The pipeline never blocks a release; SDKs are optional and dynamically imp
 
 ### Step 4.1: Specification test
 **Reference**: `07-testing-strategy.md` ST-25 · AR #12
-- [ ] 4.1.1 Write spec test: in a temp git fixture, `version()` where a stubbed `changelog()` throws still completes the bump/commit/tag (error degrades to a warning) — `src/changelog/orchestration.spec.test.ts`
-- [ ] 4.1.2 Run — verify FAIL (red phase)
+- [x] 4.1.1 Write spec test: in a temp git fixture, `version()` where a stubbed `changelog()` throws still completes the bump/commit/tag (error degrades to a warning) — `src/changelog/orchestration.spec.test.ts` ✅ (completed: 2026-07-12 01:41)
+- [x] 4.1.2 Run — verify FAIL (red phase) ✅ (completed: 2026-07-12 01:41) — failed on `changelogCalled`/tag assertions before the version→changelog wiring existed; correct red state
 
 ### Step 4.2: Implementation
 **Reference**: `03-03-writers-and-orchestration.md` §CLI / §version integration / §Packaging
-- [ ] 4.2.1 Wire the `changelog` command + `--dry-run`/`--verbose`, add `--no-changelog` to `version`, `noChangelog` to `VersionOptions`, and call `changelog()` (try/catch) inside `version()` before `git add .` — `src/cli.ts`, `src/types.ts`, `src/lockstep.ts`
-- [ ] 4.2.2 Add `openai` + `@anthropic-ai/sdk` to `optionalDependencies` and document the `changelog` command, env vars, and non-blocking behavior — `package.json`, `README.md`
-- [ ] 4.2.3 Run spec tests — verify PASS (green)
+- [x] 4.2.1 Wire the `changelog` command + `--dry-run`/`--verbose`, add `--no-changelog` to `version`, `noChangelog` to `VersionOptions`, and call `changelog()` (try/catch) inside `version()` before `git add .` — `src/cli.ts`, `src/types.ts`, `src/lockstep.ts` ✅ (completed: 2026-07-12 01:41)
+- [x] 4.2.2 Add `openai` + `@anthropic-ai/sdk` to `optionalDependencies` and document the `changelog` command, env vars, and non-blocking behavior — `package.json`, `README.md` ✅ (completed: 2026-07-12 01:41)
+- [x] 4.2.3 Run spec tests — verify PASS (green) ✅ (completed: 2026-07-12 01:41) — 76/76 pass
 
 ### Step 4.3: Implementation tests & full verification
-- [ ] 4.3.1 Impl test: core `version`/`publish` behave with SDKs absent (dynamic-import failure → fallback) — `src/changelog/orchestration.impl.test.ts`
-- [ ] 4.3.2 Full verification (all phases)
+- [x] 4.3.1 Impl test: core `version`/`publish` behave with SDKs absent (dynamic-import failure → fallback) — `src/changelog/orchestration.impl.test.ts` ✅ (completed: 2026-07-12 01:41)
+- [x] 4.3.2 Full verification (all phases) ✅ (completed: 2026-07-12 01:41) — 78/78 pass, type-check clean
 
 **Verify**: `npm run type-check && npm test`
+
+> **Runtime finding (git working-directory correctness).** ST-25 exercises `version()` against a
+> temp git fixture. The existing git operations in `lockstep.ts` (tag detection, branch, commit,
+> tag, push) ran in `process.cwd()` rather than the configured repository root, so the fixture test
+> executed real git commands against the tool's own repo. Since the root already defaults to
+> `process.cwd()`, this is a no-op in production but a correctness bug for any non-default root. All
+> git operations were routed through `this.config.root`. Recorded as PA-5 (runtime).
 
 ---
 

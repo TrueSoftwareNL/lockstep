@@ -48,7 +48,10 @@ COMMANDS:
     
   publish --tag <dist-tag> [options]
     Publish all packages in dependency order
-    
+
+  changelog [options]
+    Generate AI changelog + release notes for the current release
+
   help
     Show this help message
 
@@ -56,6 +59,11 @@ VERSION OPTIONS:
   --type <patch|minor|major|auto>  Type of version bump (required)
   --ci                             Add [skip ci] to commit message
   --no-git-commit                  Skip git commit and tag operations
+  --no-changelog                   Skip AI changelog generation during the bump
+
+CHANGELOG OPTIONS:
+  --dry-run                        Print what would be generated; write nothing
+  --verbose                        Print detailed progress and token usage
 
 PUBLISH OPTIONS:
   --tag <dist-tag>                 Distribution tag for publishing (required)
@@ -147,9 +155,17 @@ async function main(): Promise<void> {
 
       const skipCi = Boolean(opts.ci);
       const noGitCommit = Boolean(opts['no-git-commit']);
-      
-      await lockstep.version({ type, skipCi, noGitCommit });
-      
+      const noChangelog = Boolean(opts['no-changelog']);
+
+      await lockstep.version({ type, skipCi, noGitCommit, noChangelog });
+
+    } else if (cmd === 'changelog') {
+      // Handle changelog command
+      const dryRun = Boolean(opts['dry-run']);
+      const verbose = Boolean(opts.verbose);
+
+      await lockstep.changelog({ dryRun, verbose });
+
     } else if (cmd === 'publish') {
       // Handle publish command
       const access = opts.access === true ? 'public' : String(opts.access || 'public');

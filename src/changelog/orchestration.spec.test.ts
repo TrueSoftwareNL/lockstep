@@ -113,3 +113,25 @@ describe('Lockstep.changelog', () => {
         }
     });
 });
+
+/** Lockstep whose changelog step always throws, to prove version() tolerates it. */
+class ThrowingChangelogLockstep extends Lockstep {
+    changelogCalled = false;
+    override async changelog(): Promise<void> {
+        this.changelogCalled = true;
+        throw new Error('changelog boom');
+    }
+}
+
+describe('version() with a failing changelog', () => {
+    it('should complete the version bump, commit and tag even if changelog generation throws', async () => {
+        const dir = makeRepo();
+        const ls = new ThrowingChangelogLockstep({ root: dir });
+        await ls.version({ type: 'patch' });
+
+        expect(ls.changelogCalled).toBe(true);
+        const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'packages/a/package.json'), 'utf8'));
+        expect(pkg.version).toBe('1.0.1');
+        expect(execSync('git tag', { cwd: dir }).toString()).toContain('v1.0.1');
+    });
+});
