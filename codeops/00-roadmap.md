@@ -1,8 +1,8 @@
 # Portfolio Roadmap: @blendsdk/lockstep
 
 > **Status**: Active
-> **Last Updated**: 2026-07-11 23:25
-> **Features**: 0 / 0 done
+> **Last Updated**: 2026-07-12 00:13
+> **Features**: 0 / 1 done
 > **CodeOps Skills Version**: 3.3.2
 
 ## Legend
@@ -13,7 +13,7 @@
 
 | Feature | Roadmap | Stage Summary | Progress | Status | Last Updated |
 |---------|---------|---------------|----------|--------|--------------|
-| _(none yet)_ | | | | | |
+| release-enhancements | [→](features/release-enhancements/00-roadmap.md) | 3 RDs drafted · RD-02 plan created | 0/3 RDs | 🔄 | 2026-07-12 |
 
 ## Archived
 
