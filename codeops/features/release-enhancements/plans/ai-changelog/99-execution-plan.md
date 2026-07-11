@@ -2,8 +2,8 @@
 
 > **Document**: 99-execution-plan.md
 > **Parent**: [Index](00-index.md)
-> **Last Updated**: 2026-07-12 01:00
-> **Progress**: 7/26 tasks (27%)
+> **Last Updated**: 2026-07-12 01:05
+> **Progress**: 13/26 tasks (50%)
 > **CodeOps Skills Version**: 3.3.2
 
 ## Overview
@@ -59,17 +59,17 @@ docs. The pipeline never blocks a release; SDKs are optional and dynamically imp
 
 ### Step 2.1: Specification tests
 **Reference**: `07-testing-strategy.md` ST-10…16 · AR PA-4
-- [ ] 2.1.1 Write spec tests via a `LLMProvider` subclass stubbing `callOpenAI`/`callAnthropic`: provider ordering, OpenAI→Anthropic fallback, both-fail→null, no-key→null, `createLLMConfig`, prompt metadata-only — `src/changelog/llm-provider.spec.test.ts`
-- [ ] 2.1.2 Run — verify FAIL (red phase)
+- [x] 2.1.1 Write spec tests via a `LLMProvider` subclass stubbing `callOpenAI`/`callAnthropic`: provider ordering, OpenAI→Anthropic fallback, both-fail→null, no-key→null, `createLLMConfig`, prompt metadata-only — `src/changelog/llm-provider.spec.test.ts` ✅ (completed: 2026-07-12 01:02)
+- [x] 2.1.2 Run — verify FAIL (red phase) ✅ (completed: 2026-07-12 01:02) — missing module; correct red state
 
 ### Step 2.2: Implementation
 **Reference**: `03-02-llm-provider-and-prompts.md`
-- [ ] 2.2.1 Add `LLMConfig`, `LLMResult` types; implement `src/changelog/llm-provider.ts` (`createLLMConfig`, `LLMProvider` with protected dynamic-import seams, never-throw `generate`) and `src/changelog/prompts.ts` (metadata-only builders). Pin default model IDs to current generation via the claude-api reference for the Claude model.
-- [ ] 2.2.2 Run spec tests — verify PASS (green)
+- [x] 2.2.1 Add `LLMConfig`, `LLMResult` types; implement `src/changelog/llm-provider.ts` (`createLLMConfig`, `LLMProvider` with protected dynamic-import seams, never-throw `generate`) and `src/changelog/prompts.ts` (metadata-only builders). Default models current-gen (`gpt-4o-mini`, `claude-haiku-4-5-20251001`), env-overridable; SDKs via runtime-resolved dynamic import (optional, no build dep) ✅ (completed: 2026-07-12 01:04)
+- [x] 2.2.2 Run spec tests — verify PASS (green) ✅ (completed: 2026-07-12 01:04) — fixed exactOptionalPropertyTypes on LLMConfig; 59/59 pass
 
 ### Step 2.3: Implementation tests & hardening
-- [ ] 2.3.1 Write impl tests: timeout/maxTokens defaults, capped body/file formatting, token accounting — `src/changelog/llm-provider.impl.test.ts`
-- [ ] 2.3.2 Full verification
+- [x] 2.3.1 Write impl tests: timeout/maxTokens defaults, capped body/file formatting, token accounting — `src/changelog/llm-provider.impl.test.ts` ✅ (completed: 2026-07-12 01:05)
+- [x] 2.3.2 Full verification ✅ (completed: 2026-07-12 01:05) — 63/63 pass, type-check clean
 
 **Verify**: `npm run type-check && npm test`
 

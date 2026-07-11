@@ -48,9 +48,9 @@ export interface PackageChangeSummary {
  * current low-cost models and are overridable.
  */
 export interface LLMConfig {
-    openaiApiKey?: string;
+    openaiApiKey?: string | undefined;
     openaiModel: string;
-    anthropicApiKey?: string;
+    anthropicApiKey?: string | undefined;
     anthropicModel: string;
 }
 
