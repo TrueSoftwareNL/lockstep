@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-07-12
+
+Added:
+- Add optional dependencies for @anthropic-ai/sdk and openai to enable AI-powered functionality.
+- Introduce `lockstep changelog` command for automatic changelog generation.
+- Implement change-detection module for improved tracking of changes across packages.
+- Add LLM provider and prompts for AI integration in changelog generation.
+- Support for single-package repositories allowing workspace discovery at the root.
+
+Changed:
+- Standardize CI workflows to use Node 22 LTS.
+- Reconcile packageManager field from Yarn to npm@10.9.2.
+- Versioning and publishing commands now utilize lockstep's own commands.
+
+Deprecated:
+- None.
+
+Removed:
+- None.
+
+Fixed:
+- Upgrade dev dependencies to ensure compatibility and improved performance.
+  
+Security:
+- None.
+
 ## [1.0.0] - 2025-08-30
 
 ### Added
