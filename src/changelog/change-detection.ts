@@ -145,8 +145,11 @@ export function attributeCommitToPackages(commit: ParsedCommit, packages: Worksp
     }
     const matched = new Set<string>();
     for (const p of packages) {
-        const prefix = relDir(p, root) + '/';
-        if (commit.files.some(f => f.startsWith(prefix))) matched.add(p.name);
+        const rel = relDir(p, root);
+        // A root-level package (empty relative dir, i.e. a single-package repo) owns every changed
+        // file; a nested package owns only files beneath its own directory.
+        const owns = (f: string): boolean => rel === '' || f.startsWith(rel + '/');
+        if (commit.files.some(owns)) matched.add(p.name);
     }
     return [...matched];
 }

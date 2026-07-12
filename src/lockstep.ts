@@ -156,6 +156,15 @@ export class Lockstep {
             searchRecursively(basePath);
         }
 
+        // Single-package repositories keep their only package.json at the repository root with no
+        // packages/ directory. When workspace discovery finds nothing, fall back to that root
+        // package so version, changelog, and publish still operate on it. Monorepos are unaffected:
+        // their packages/ entries are discovered above, so this fallback never triggers — and a
+        // monorepo's (often private) workspace-root package.json is never swept in.
+        if (dirs.length === 0 && exists(path.join(this.config.root, "package.json"))) {
+            dirs.push(this.config.root);
+        }
+
         return dirs;
     }
 
