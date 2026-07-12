@@ -56,62 +56,16 @@ jobs:
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
 
-      - name: Determine version bump
+      - name: Version, changelog, and tag
         if: steps.changes.outputs.has_changes == 'true'
-        id: version
+        # lockstep detects the bump from conventional commits, generates the AI changelog and
+        # release notes into the release commit, then commits ("[skip ci]") and tags.
         run: |
-          # Get commits since last tag
-          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          if [ -z "$LAST_TAG" ]; then
-            echo "No previous tags found, using patch"
-            echo "bump_type=patch" >> $GITHUB_OUTPUT
-          else
-            COMMITS=$(git log $LAST_TAG..HEAD --pretty=format:"%s")
-            if echo "$COMMITS" | grep -q "BREAKING CHANGE\|!:"; then
-              echo "bump_type=major" >> $GITHUB_OUTPUT
-            elif echo "$COMMITS" | grep -q "^feat"; then
-              echo "bump_type=minor" >> $GITHUB_OUTPUT
-            else
-              echo "bump_type=patch" >> $GITHUB_OUTPUT
-            fi
-          fi
-
-      - name: Bump version
-        if: steps.changes.outputs.has_changes == 'true'
-        run: |
-          CURRENT_VERSION=$(node -p "require('./package.json').version")
-          echo "Current version: $CURRENT_VERSION"
-          
-          # Parse version
-          IFS='.' read -ra VERSION_PARTS <<< "$CURRENT_VERSION"
-          MAJOR=${VERSION_PARTS[0]}
-          MINOR=${VERSION_PARTS[1]}
-          PATCH=${VERSION_PARTS[2]}
-          
-          # Bump version based on type
-          if [ "${{ steps.version.outputs.bump_type }}" = "major" ]; then
-            MAJOR=$((MAJOR + 1))
-            MINOR=0
-            PATCH=0
-          elif [ "${{ steps.version.outputs.bump_type }}" = "minor" ]; then
-            MINOR=$((MINOR + 1))
-            PATCH=0
-          else
-            PATCH=$((PATCH + 1))
-          fi
-          
-          NEW_VERSION="$MAJOR.$MINOR.$PATCH"
-          echo "New version: $NEW_VERSION"
-          
-          # Update package.json
-          npm version $NEW_VERSION --no-git-tag-version
-          
-          # Commit and tag
-          git add package.json
-          git commit -m "chore(release): v$NEW_VERSION [skip ci]"
-          git tag "v$NEW_VERSION"
-          
-          echo "new_version=$NEW_VERSION" >> $GITHUB_ENV
+          node dist/cli.js version --type auto --ci
+          echo "new_version=$(node -p "require('./package.json').version")" >> $GITHUB_ENV
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
       - name: Push changes
         if: steps.changes.outputs.has_changes == 'true'
@@ -119,9 +73,11 @@ jobs:
           git push origin ${{ github.ref_name }}
           git push origin --tags
 
-      - name: Publish to NPM
+      - name: Publish to NPM with provenance
         if: steps.changes.outputs.has_changes == 'true'
-        run: npm publish --provenance
+        # lockstep publishes each package in dependency order; --provenance is honored because this
+        # runs in GitHub Actions (id-token: write) and every package declares a repository field.
+        run: node dist/cli.js publish --tag latest --provenance
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
