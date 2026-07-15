@@ -67,6 +67,14 @@ export interface PublishOptions {
 }
 
 /**
+ * Options for the sync command
+ */
+export interface SyncOptions {
+  /** Preview which packages would change without writing any files */
+  dryRun?: boolean;
+}
+
+/**
  * Options for the version command
  */
 export interface VersionOptions {
@@ -113,4 +121,4 @@ export type DependencyField =
 export type PackageManager = 'npm' | 'yarn' | 'pnpm';
 
 /** CLI command types */
-export type Command = 'version' | 'publish' | 'help';
+export type Command = 'version' | 'sync' | 'changelog' | 'publish' | 'help';

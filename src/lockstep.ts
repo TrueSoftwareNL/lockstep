@@ -22,6 +22,7 @@ import type {
     PackageJson,
     PackageManager,
     PublishOptions,
+    SyncOptions,
     VersionOptions,
     WorkspaceInfo,
     WorkspacePackage
@@ -255,6 +256,63 @@ export class Lockstep {
     }
 
     /**
+     * Compares two semantic versions by precedence.
+     *
+     * The three numeric fields are compared as integers, so `1.10.0` correctly outranks `1.9.0` —
+     * a plain string comparison would get this backwards. A normal release outranks its own
+     * pre-release (`1.0.0` > `1.0.0-alpha`, per semver); when both carry a pre-release and their
+     * numeric cores are equal, the pre-release identifiers are compared as plain strings. That last
+     * step is a deliberate simplification: it orders the common cases (`alpha` < `beta`) without a
+     * full dot-separated precedence walk, which lockstep's uniform versions never need.
+     *
+     * @param a - First version string
+     * @param b - Second version string
+     * @returns Negative if a precedes b, positive if a follows b, zero if equal in precedence
+     * @throws Error if either argument is not a valid semver version
+     *
+     * @example
+     * lockstep.semverCompare("1.10.0", "1.9.0"); // > 0 (10 is greater than 9 numerically)
+     */
+    semverCompare(a: string, b: string): number {
+        const parse = (v: string): { nums: number[]; pre: string } => {
+            const m = v.match(/^(\d+)\.(\d+)\.(\d+)(?:-(.+))?$/);
+            if (!m) throw new Error(`Not a semver version: ${v}`);
+            return { nums: [+m[1], +m[2], +m[3]], pre: m[4] ?? "" };
+        };
+
+        const pa = parse(a);
+        const pb = parse(b);
+
+        for (let i = 0; i < 3; i++) {
+            if (pa.nums[i] !== pb.nums[i]) return pa.nums[i] - pb.nums[i];
+        }
+
+        // Equal numeric cores: a missing pre-release ranks above any present one.
+        if (pa.pre === pb.pre) return 0;
+        if (pa.pre === "") return 1;
+        if (pb.pre === "") return -1;
+        return pa.pre < pb.pre ? -1 : 1;
+    }
+
+    /**
+     * Returns the highest-precedence version from a non-empty list, using {@link semverCompare}.
+     * @param versions - Version strings to compare (at least one)
+     * @returns The greatest version by semver precedence
+     * @throws Error if the list is empty or any entry is not a valid semver version
+     *
+     * @example
+     * lockstep.highestVersion(["1.0.0", "1.10.0", "1.9.0"]); // "1.10.0"
+     */
+    highestVersion(versions: string[]): string {
+        if (versions.length === 0) {
+            throw new Error("highestVersion requires at least one version");
+        }
+        // Seed the reduction with the first entry and compare every element, so an invalid version
+        // anywhere — including a lone entry — is rejected by semverCompare rather than passed through.
+        return versions.reduce((max, v) => (this.semverCompare(v, max) > 0 ? v : max), versions[0]);
+    }
+
+    /**
      * Preserves the version range operator when updating dependency versions
      * @param oldRange - Original version range (e.g., "^1.2.3", "~1.2.3")
      * @param newVersion - New version to apply
@@ -434,41 +492,7 @@ export class Lockstep {
         const current = this.ensureAllSameVersion(packages);
         const next = this.semverBump(current, actualType);
 
-        // Create set for quick internal package lookup
-        const internalNames = new Set(packages.map((p) => p.name));
-
-        // Update version in all packages and their internal dependencies
-        for (const p of packages) {
-            const pkg = p.data;
-            pkg.version = next;
-
-            // Update internal dependency versions
-            for (const field of DEP_FIELDS) {
-                const deps = pkg[field];
-                if (!deps) continue;
-
-                for (const [dep, range] of Object.entries(deps)) {
-                    if (!internalNames.has(dep)) continue;
-                    if (typeof range !== "string") continue;
-                    // Update internal dependency version while preserving range operator
-                    deps[dep] = this.preserveOperator(range, next);
-                }
-            }
-
-            writeJSON(p.pkgPath, pkg);
-            console.log(`✔ ${p.name} -> ${next}`);
-        }
-
-        // Update root package.json version if it exists
-        const rootPkgPath = path.join(this.config.root, "package.json");
-        if (exists(rootPkgPath)) {
-            const rootPkg = readJSON(rootPkgPath);
-            if (rootPkg.version) {
-                rootPkg.version = next;
-                writeJSON(rootPkgPath, rootPkg);
-                console.log(`✔ root -> ${next}`);
-            }
-        }
+        this.applyVersion(packages, next);
 
         // Generate the changelog into the release commit, unless opted out. A changelog failure
         // must never abort a release that already succeeded, so any error degrades to a warning.
@@ -492,6 +516,114 @@ export class Lockstep {
         } else {
             console.log(`\nAll packages bumped to v${next}. Git commit and tag skipped.`);
         }
+    }
+
+    /**
+     * Writes a single target version across every workspace package and the repository-root
+     * package.json, rewriting internal cross-dependency ranges to match while preserving each
+     * range's operator. Shared by the lockstep bump and the drift-recovery sync so both apply a
+     * version identically.
+     * @param packages - The workspace packages to rewrite
+     * @param next - The version string to apply everywhere
+     */
+    protected applyVersion(packages: WorkspacePackage[], next: string): void {
+        // Internal package names drive which dependency ranges get rewritten; external dependencies
+        // are left untouched so only the monorepo's own cross-references move in lockstep.
+        const internalNames = new Set(packages.map((p) => p.name));
+
+        for (const p of packages) {
+            const pkg = p.data;
+            pkg.version = next;
+
+            for (const field of DEP_FIELDS) {
+                const deps = pkg[field];
+                if (!deps) continue;
+
+                for (const [dep, range] of Object.entries(deps)) {
+                    if (!internalNames.has(dep)) continue;
+                    if (typeof range !== "string") continue;
+                    deps[dep] = this.preserveOperator(range, next);
+                }
+            }
+
+            writeJSON(p.pkgPath, pkg);
+            console.log(`✔ ${p.name} -> ${next}`);
+        }
+
+        // A monorepo's workspace-root package.json is not part of `packages`; keep it in step so its
+        // version never drifts from the packages it aggregates.
+        const rootPkgPath = path.join(this.config.root, "package.json");
+        if (exists(rootPkgPath)) {
+            const rootPkg = readJSON(rootPkgPath);
+            if (rootPkg.version) {
+                rootPkg.version = next;
+                writeJSON(rootPkgPath, rootPkg);
+                console.log(`✔ root -> ${next}`);
+            }
+        }
+    }
+
+    /**
+     * Realigns every package to the highest version found, recovering a workspace whose packages
+     * have drifted out of lockstep.
+     *
+     * Unlike {@link version} this mints no new version and touches no git state: it scans all
+     * packages (and the repository-root package.json), selects the greatest version by semver
+     * precedence, and rewrites every package plus its internal dependency ranges to that version.
+     * When the workspace is already uniform it reports so and writes nothing. This is the recovery
+     * path for the "all packages share a version" invariant that {@link version}, changelog
+     * generation, and {@link publish} all depend on.
+     *
+     * @param options - Dry-run switch to preview the change set without writing
+     *
+     * @example
+     * await lockstep.syncVersions();                 // realign every package to the highest version
+     * await lockstep.syncVersions({ dryRun: true });  // preview which packages would change
+     */
+    async syncVersions(options: SyncOptions = {}): Promise<void> {
+        const { dryRun = false } = options;
+
+        const { packages } = this.buildWorkspace();
+        if (packages.length === 0) {
+            console.log("No packages found; nothing to sync.");
+            return;
+        }
+
+        // A single-package repo discovers its root as the package itself; a monorepo keeps a
+        // separate aggregator root outside `packages`. Only that separate root needs folding into
+        // the candidate set and drift check — otherwise the root is already covered by `packages`.
+        const rootPkgPath = path.join(this.config.root, "package.json");
+        const rootIsPackage = packages.some((p) => p.pkgPath === rootPkgPath);
+
+        let rootVersion: string | undefined;
+        if (!rootIsPackage && exists(rootPkgPath)) {
+            const v = readJSON(rootPkgPath).version;
+            if (v) rootVersion = v;
+        }
+
+        const candidates = packages.map((p) => p.version);
+        if (rootVersion) candidates.push(rootVersion);
+
+        const target = this.highestVersion(candidates);
+
+        const behind = packages.filter((p) => p.version !== target);
+        const rootBehind = rootVersion !== undefined && rootVersion !== target;
+
+        if (behind.length === 0 && !rootBehind) {
+            console.log(`All packages already in sync at v${target}.`);
+            return;
+        }
+
+        if (dryRun) {
+            console.log(`[dry-run] Would sync to v${target}:`);
+            for (const p of behind) console.log(`  ${p.name}: ${p.version} -> ${target}`);
+            if (rootBehind) console.log(`  (root package.json): ${rootVersion} -> ${target}`);
+            return;
+        }
+
+        console.log(`Syncing all packages to the highest version found: v${target}`);
+        this.applyVersion(packages, target);
+        console.log(`\nAll packages synced to v${target}.`);
     }
 
     /**

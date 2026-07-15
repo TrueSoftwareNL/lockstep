@@ -5,6 +5,7 @@ A comprehensive monorepo package management tool that maintains synchronized ver
 ## Features
 
 - **Lockstep Versioning**: All packages maintain the same version number
+- **Drift Recovery**: `sync` realigns packages that fell out of lockstep to the highest version found
 - **Dependency-Aware Publishing**: Uses topological sorting to publish dependencies first
 - **Branch-Based Dist-Tags**: Automatic prefixing based on git branch
 - **Conventional Commits**: Automatic version detection from commit messages
@@ -46,6 +47,9 @@ lockstep version --type patch
 
 # Automatically determine version from conventional commits
 lockstep version --type auto
+
+# Realign packages that drifted out of lockstep to the highest version
+lockstep sync
 
 # Publish all packages to latest
 lockstep publish --tag latest
@@ -92,6 +96,31 @@ lockstep version --type patch --no-changelog
 
 By default a version bump also generates changelog and release-notes files and folds them into the
 release commit. See [AI Changelog & Release Notes](#ai-changelog--release-notes) below.
+
+### Sync Command
+
+Realigns packages that have drifted out of lockstep by setting every package — and its internal
+dependency ranges — to the **highest** version found across the workspace. This is the recovery
+path for when `version`, `changelog`, or `publish` fail because the packages no longer share a
+single version.
+
+```bash
+lockstep sync [options]
+```
+
+Unlike `version`, `sync` mints no new version and touches no git state: it rewrites `package.json`
+files only, leaving the commit and tag to you. When the workspace is already uniform it reports so
+and changes nothing. The highest version is chosen by numeric semver precedence, so `1.10.0`
+correctly wins over `1.9.0`.
+
+**Options:**
+- `--dry-run` - Print which packages would change; write nothing
+
+**Examples:**
+```bash
+lockstep sync
+lockstep sync --dry-run
+```
 
 ### Changelog Command
 
@@ -273,6 +302,9 @@ await lockstep.version({
   skipCi: true,
   noGitCommit: false
 });
+
+// Realign drifted packages to the highest version found (rewrites package.json only)
+await lockstep.syncVersions({ dryRun: false });
 
 // Publish all packages
 await lockstep.publish({
