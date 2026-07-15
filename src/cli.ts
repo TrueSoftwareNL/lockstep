@@ -45,7 +45,10 @@ USAGE:
 COMMANDS:
   version --type <patch|minor|major|auto> [options]
     Bump versions of all packages in lockstep
-    
+
+  sync [options]
+    Realign packages that drifted out of lockstep to the highest version found
+
   publish --tag <dist-tag> [options]
     Publish all packages in dependency order
 
@@ -60,6 +63,9 @@ VERSION OPTIONS:
   --ci                             Add [skip ci] to commit message
   --no-git-commit                  Skip git commit and tag operations
   --no-changelog                   Skip AI changelog generation during the bump
+
+SYNC OPTIONS:
+  --dry-run                        Print which packages would change; write nothing
 
 CHANGELOG OPTIONS:
   --dry-run                        Print what would be generated; write nothing
@@ -78,7 +84,10 @@ EXAMPLES:
   lockstep version --type major --no-git-commit
   lockstep version --type auto
   lockstep version --type auto --ci
-  
+
+  lockstep sync
+  lockstep sync --dry-run
+
   lockstep publish --tag latest
   lockstep publish --tag alpha
   lockstep publish --tag beta --dry
@@ -98,6 +107,10 @@ NOTES:
   • Package manager detection: Automatically detects npm, yarn, or pnpm
 
   • Lockstep versioning: All packages maintain the same version number
+
+  • lockstep sync recovers from version drift: it sets every package (and its internal
+    dependency ranges) to the highest version found. It rewrites package.json files only —
+    no git commit, tag, or changelog — so you review and commit the result yourself.
 
   • --provenance: Generates npm provenance attestations. Requires a supported CI
     (GitHub Actions or GitLab CI) with id-token permission, and a "repository"
@@ -158,6 +171,12 @@ async function main(): Promise<void> {
       const noChangelog = Boolean(opts['no-changelog']);
 
       await lockstep.version({ type, skipCi, noGitCommit, noChangelog });
+
+    } else if (cmd === 'sync') {
+      // Handle sync command - realign drifted packages to the highest version found
+      const dryRun = Boolean(opts['dry-run']);
+
+      await lockstep.syncVersions({ dryRun });
 
     } else if (cmd === 'changelog') {
       // Handle changelog command

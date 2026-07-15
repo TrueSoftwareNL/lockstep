@@ -11,6 +11,7 @@ export type {
   WorkspacePackage,
   WorkspaceInfo,
   PublishOptions,
+  SyncOptions,
   VersionOptions,
   CliOptions,
   LockstepConfig,
