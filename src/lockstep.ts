@@ -23,6 +23,7 @@ import type {
     PackageManager,
     PublishOptions,
     SyncOptions,
+    TagMode,
     VersionOptions,
     WorkspaceInfo,
     WorkspacePackage
@@ -34,6 +35,13 @@ import type {
 
 /** All dependency fields to check when building dependency graph */
 const DEP_FIELDS: DependencyField[] = ["dependencies", "devDependencies", "peerDependencies", "optionalDependencies"];
+
+/**
+ * Shell-safe npm dist-tag shape. npm itself rejects tags that encode differently in a URL and
+ * tags that parse as semver; this conservative allowlist also keeps CLI input out of shell
+ * metacharacters, because publish commands are executed through a shell.
+ */
+const DIST_TAG_PATTERN = /^[A-Za-z][A-Za-z0-9._-]*$/;
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -123,6 +131,20 @@ export class Lockstep {
             packagesDirs,
             packageManager: config.packageManager || this.detectPackageManager()
         };
+    }
+
+    /**
+     * Executes a side-effecting command in the given directory, inheriting its output.
+     *
+     * Package-manager and publish commands live behind this seam so tests can record or fail
+     * them without invoking a real registry client. Git commands are executed directly because
+     * their behavior (tags, pushes, commits) is part of what the tests need to observe.
+     *
+     * @param cmd - Command to execute
+     * @param cwd - Working directory the command runs in
+     */
+    protected execCommand(cmd: string, cwd: string): void {
+        execSync(cmd, { cwd, stdio: "inherit" });
     }
 
     /**
@@ -313,18 +335,73 @@ export class Lockstep {
     }
 
     /**
-     * Preserves the version range operator when updating dependency versions
+     * Preserves the version range operator when updating dependency versions.
+     *
+     * `workspace:` ranges are intentionally returned untouched. That protocol is resolved by
+     * pnpm from the local workspace, and pnpm rewrites it to a concrete range when the package
+     * is packed. Rewriting it here would break the workspace link.
+     *
      * @param oldRange - Original version range (e.g., "^1.2.3", "~1.2.3")
      * @param newVersion - New version to apply
      * @returns New version range with preserved operator
      */
     preserveOperator(oldRange: string, newVersion: string): string {
+        if (oldRange.startsWith("workspace:")) return oldRange;
         if (oldRange.startsWith("^")) return `^${newVersion}`;
         if (oldRange.startsWith("~")) return `~${newVersion}`;
         if (oldRange.startsWith(">=")) return `>=${newVersion}`;
         if (oldRange.startsWith("=")) return `=${newVersion}`;
         // For exact versions, wildcards, or other formats, use exact version
         return newVersion;
+    }
+
+    /**
+     * Validates an npm dist-tag before it is interpolated into a shell command.
+     *
+     * @param tag - The final tag that will be passed to the package manager
+     * @throws Error when the tag is empty or contains characters npm or the shell cannot accept
+     */
+    private validateDistTag(tag: string): void {
+        if (!DIST_TAG_PATTERN.test(tag)) {
+            throw new Error(
+                `Invalid npm dist-tag "${tag}". Tags must start with a letter and contain only ` +
+                    `letters, digits, dots, underscores, and hyphens. Use --tag-mode exact or a ` +
+                    `branch name without "/" or other special characters.`
+            );
+        }
+    }
+
+    /**
+     * Validates the npm access level before it is interpolated into a shell command.
+     *
+     * @param access - The requested access level
+     * @throws Error when the value is not "public" or "restricted"
+     */
+    private validateAccess(access: string): void {
+        if (access !== "public" && access !== "restricted") {
+            throw new Error(`--access must be "public" or "restricted", received "${access}"`);
+        }
+    }
+
+    /**
+     * Resolves the dist-tag that publish will send to the registry.
+     *
+     * `latest` is always used verbatim. In `exact` mode every tag is used verbatim, which is how
+     * a `next` or `beta` release gets its expected global tag. In `branch` mode (the default),
+     * non-`latest` tags are prefixed with the current branch for backward compatibility.
+     *
+     * @param tag - The tag supplied by the caller
+     * @param mode - Tag derivation mode
+     * @param branch - Current git branch, used only by branch mode
+     * @returns The final dist-tag
+     *
+     * @example
+     * lockstep.resolveDistTag("next", "exact", "main");     // "next"
+     * lockstep.resolveDistTag("next", "branch", "main");    // "main-next"
+     */
+    resolveDistTag(tag: string, mode: TagMode, branch: string): string {
+        if (tag === "latest") return "latest";
+        return mode === "exact" ? tag : `${branch}-${tag}`;
     }
 
     /**
@@ -473,11 +550,45 @@ export class Lockstep {
     }
 
     /**
-     * Bumps versions of all packages in lockstep and optionally commits/tags
-     * @param options - Version options including type, skipCi, and noGitCommit
+     * Regenerates the pnpm lockfile importer specifiers after package manifests changed.
+     *
+     * A pnpm workspace lockfile records each workspace package's version and internal dependency
+     * ranges. Rewriting `package.json` without refreshing it leaves the two out of sync, so the
+     * next `pnpm install --frozen-lockfile` fails. `--lockfile-only` updates just the lockfile,
+     * without touching `node_modules`.
+     *
+     * The refresh is skipped when no `pnpm-lock.yaml` exists. When pnpm is unavailable or the
+     * command fails, the error is fatal: continuing would commit a lockfile that does not match
+     * the manifests.
+     *
+     * @throws Error with recovery guidance when the refresh fails
+     */
+    protected refreshLockfile(): void {
+        if (!exists(path.join(this.config.root, "pnpm-lock.yaml"))) return;
+
+        console.log("Refreshing pnpm lockfile...");
+        try {
+            this.execCommand("pnpm install --lockfile-only", this.config.root);
+        } catch {
+            throw new Error(
+                "Failed to refresh pnpm-lock.yaml with `pnpm install --lockfile-only`. " +
+                    "Ensure pnpm is installed and the workspace is valid, or rerun with " +
+                    "--no-lockfile-refresh to skip the refresh."
+            );
+        }
+    }
+
+    /**
+     * Bumps versions of all packages in lockstep and optionally commits/tags.
+     *
+     * After rewriting the manifests, a pnpm workspace's lockfile is refreshed so a later
+     * `pnpm install --frozen-lockfile` remains valid. The release tag is annotated, which lets
+     * `git push --follow-tags` push it.
+     *
+     * @param options - Bump type plus skip/no-op switches and the lockfile refresh toggle
      */
     async version(options: VersionOptions): Promise<void> {
-        const { type, skipCi = false, noGitCommit = false, noChangelog = false } = options;
+        const { type, skipCi = false, noGitCommit = false, noChangelog = false, lockfileRefresh = true } = options;
 
         // If auto is specified, determine the actual version type
         const actualType = type === "auto" ? this.determineVersionType() : type;
@@ -493,6 +604,10 @@ export class Lockstep {
         const next = this.semverBump(current, actualType);
 
         this.applyVersion(packages, next);
+
+        // Keep the pnpm lockfile's importer specifiers aligned with the manifests before the
+        // release commit is created, so `pnpm install --frozen-lockfile` continues to pass.
+        if (lockfileRefresh) this.refreshLockfile();
 
         // Generate the changelog into the release commit, unless opted out. A changelog failure
         // must never abort a release that already succeeded, so any error degrades to a warning.
@@ -510,7 +625,8 @@ export class Lockstep {
             execSync(`git add .`, { cwd: this.config.root, stdio: "inherit" });
             const commitMessage = `chore(release): v${next}${skipCi ? " [skip ci]" : ""}`;
             execSync(`git commit -m "${commitMessage}"`, { cwd: this.config.root, stdio: "inherit" });
-            execSync(`git tag v${next}`, { cwd: this.config.root, stdio: "inherit" });
+            // Annotated tags are required for `git push --follow-tags` to push the release tag.
+            execSync(`git tag -a v${next} -m "v${next}"`, { cwd: this.config.root, stdio: "inherit" });
 
             console.log(`\nAll packages bumped to v${next} and tagged.`);
         } else {
@@ -574,14 +690,14 @@ export class Lockstep {
      * path for the "all packages share a version" invariant that {@link version}, changelog
      * generation, and {@link publish} all depend on.
      *
-     * @param options - Dry-run switch to preview the change set without writing
+     * @param options - Dry-run switch and the lockfile refresh toggle
      *
      * @example
      * await lockstep.syncVersions();                 // realign every package to the highest version
      * await lockstep.syncVersions({ dryRun: true });  // preview which packages would change
      */
     async syncVersions(options: SyncOptions = {}): Promise<void> {
-        const { dryRun = false } = options;
+        const { dryRun = false, lockfileRefresh = true } = options;
 
         const { packages } = this.buildWorkspace();
         if (packages.length === 0) {
@@ -623,28 +739,70 @@ export class Lockstep {
 
         console.log(`Syncing all packages to the highest version found: v${target}`);
         this.applyVersion(packages, target);
+        if (lockfileRefresh) this.refreshLockfile();
         console.log(`\nAll packages synced to v${target}.`);
     }
 
     /**
-     * Publishes all packages in dependency order with branch-prefixed dist-tags
-     * @param options - Publishing options including access, dry run, tag, and git push
+     * Publishes all packages in dependency order, skipping private packages.
+     *
+     * By default non-`latest` tags are branch-prefixed for backward compatibility. Pass
+     * `tagMode: "exact"` to publish the supplied tag verbatim. When `preflight` is set, every
+     * publishable package is dry-run first so a packaging failure cannot strand earlier packages
+     * on the registry.
+     *
+     * @param options - Publishing options including access, tag, tag mode, preflight, and git push
      */
     async publish(options: PublishOptions): Promise<void> {
-        const { access = "public", dry = false, tag, gitPush = false, provenance = false } = options;
+        const {
+            access = "public",
+            dry = false,
+            tag,
+            tagMode = "branch",
+            preflight = false,
+            gitPush = false,
+            provenance = false
+        } = options;
 
         if (!tag) {
             throw new Error("--tag parameter is required for publish command");
         }
+        if (tagMode !== "branch" && tagMode !== "exact") {
+            throw new Error('--tag-mode must be "branch" or "exact"');
+        }
+        this.validateAccess(access);
 
-        const { packages, graph } = this.buildWorkspace();
+        const { packages, byName, graph } = this.buildWorkspace();
         const order = this.topoSort(packages, graph); // Ensure dependencies publish first
-        console.log("Publish order:", order.join(" -> "));
+
+        // Private packages stay in the graph so their dependents still sort correctly, but they
+        // are never handed to a registry. npm refuses to publish a package marked private.
+        const publishable: WorkspacePackage[] = [];
+        const skipped: string[] = [];
+        for (const name of order) {
+            const p = byName.get(name);
+            if (!p) {
+                throw new Error(`Package ${name} not found in workspace`);
+            }
+            if (p.data.private === true) skipped.push(name);
+            else publishable.push(p);
+        }
+
+        if (skipped.length > 0) {
+            console.log(`Skipping private packages: ${skipped.join(", ")}`);
+        }
+        if (publishable.length === 0) {
+            console.warn("No publishable packages found; every discovered package is private.");
+            return;
+        }
+
+        console.log("Publish order:", publishable.map((p) => p.name).join(" -> "));
 
         // Resolve provenance up front: detect the CI, decide which packages get attestation, and
         // validate their repository fields before anything is published — a missing field aborts
-        // the whole run rather than stranding half the monorepo on the registry.
-        const provenancePlan = planProvenance(packages, { flag: provenance, env: process.env });
+        // the whole run rather than stranding half the monorepo on the registry. Private packages
+        // are excluded because they are not part of the publish set.
+        const provenancePlan = planProvenance(publishable, { flag: provenance, env: process.env });
         const provenanceLine = provenanceLogLine(provenancePlan);
         if (provenanceLine) console.log(provenanceLine);
 
@@ -655,34 +813,47 @@ export class Lockstep {
             );
         }
 
-        // Create branch-prefixed dist-tag (except for 'latest')
         const currentBranch = git("rev-parse --abbrev-ref HEAD", this.config.root);
-        const finalTag = tag === "latest" ? "latest" : `${currentBranch}-${tag}`;
+        if (tagMode === "branch" && tag !== "latest" && currentBranch === "HEAD") {
+            throw new Error(
+                "Cannot derive a branch-prefixed dist-tag in detached HEAD. Use --tag-mode exact."
+            );
+        }
+
+        const finalTag = this.resolveDistTag(tag, tagMode, currentBranch);
+        this.validateDistTag(finalTag);
 
         console.log(`Publishing with dist-tag: ${finalTag}`);
-        if (tag !== "latest") {
+        if (tagMode === "branch" && tag !== "latest") {
             console.log(`Branch: ${currentBranch}, Original tag: ${tag}`);
         }
 
         console.log(`Using package manager: ${this.config.packageManager}`);
 
-        // Publish each package in dependency order
-        for (const name of order) {
-            const p = packages.find((x) => x.name === name);
-            if (!p) {
-                throw new Error(`Package ${name} not found in workspace`);
-            }
-
+        const publishPackage = (p: WorkspacePackage, isDry: boolean): void => {
             // pnpm publishes with its own CLI; npm and yarn both publish via `npm publish`.
             // Provenance is applied only to the packages the plan enabled.
             const cmd = buildPublishCommand(this.config.packageManager, {
                 access,
                 tag: finalTag,
-                provenance: provenancePlan.effective && provenancePlan.enabledPackages.has(name),
-                dry
+                provenance: provenancePlan.effective && provenancePlan.enabledPackages.has(p.name),
+                dry: isDry
             });
 
-            execSync(cmd, { cwd: p.dir, stdio: "inherit" });
+            this.execCommand(cmd, p.dir);
+        };
+
+        // Dry-run every package first so a packaging error in a later package aborts the run
+        // before any earlier package is irreversibly published.
+        if (preflight && !dry) {
+            console.log("\nPreflight: dry-running every package before publishing...");
+            for (const p of publishable) publishPackage(p, true);
+            console.log("Preflight passed; starting real publish.");
+        }
+
+        // Publish each package in dependency order
+        for (const p of publishable) {
+            publishPackage(p, dry);
         }
 
         // Push git changes and tags if requested (and not in dry run)

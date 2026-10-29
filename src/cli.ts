@@ -63,9 +63,12 @@ VERSION OPTIONS:
   --ci                             Add [skip ci] to commit message
   --no-git-commit                  Skip git commit and tag operations
   --no-changelog                   Skip AI changelog generation during the bump
+  --no-lockfile-refresh            Skip refreshing pnpm-lock.yaml after the bump
+  --fail-on-no-changes             Exit 1 when there are no changes since the last tag
 
 SYNC OPTIONS:
   --dry-run                        Print which packages would change; write nothing
+  --no-lockfile-refresh            Skip refreshing pnpm-lock.yaml after syncing
 
 CHANGELOG OPTIONS:
   --dry-run                        Print what would be generated; write nothing
@@ -73,8 +76,10 @@ CHANGELOG OPTIONS:
 
 PUBLISH OPTIONS:
   --tag <dist-tag>                 Distribution tag for publishing (required)
+  --tag-mode <branch|exact>        Tag derivation mode (default: branch)
   --access <public|restricted>     NPM access level (default: public)
   --dry                            Perform a dry run without publishing
+  --preflight                      Dry-run every package before publishing any
   --git-push                       Push git changes and tags after publish
   --provenance                     Generate npm provenance (requires GitHub Actions or GitLab CI)
 
@@ -84,12 +89,14 @@ EXAMPLES:
   lockstep version --type major --no-git-commit
   lockstep version --type auto
   lockstep version --type auto --ci
+  lockstep version --type auto --fail-on-no-changes
 
   lockstep sync
   lockstep sync --dry-run
 
   lockstep publish --tag latest
-  lockstep publish --tag alpha
+  lockstep publish --tag next --tag-mode exact
+  lockstep publish --tag beta --tag-mode exact --preflight
   lockstep publish --tag beta --dry
   lockstep publish --tag latest --access restricted
   lockstep publish --tag alpha --git-push
@@ -101,9 +108,18 @@ NOTES:
     - fix:, docs:, style:, refactor:, test:, chore: → patch version bump
     - BREAKING CHANGE or !: → major version bump
   
-  • Branch-based dist-tags: Non-main branches get prefixed with branch name
-    Example: 'alpha' on 'feature-branch' becomes 'feature-branch-alpha'
-  
+  • Branch-based dist-tags (default): non-latest tags on a branch are prefixed with
+    the branch name. Example: 'next' on 'feature-x' becomes 'feature-x-next'.
+    Use --tag-mode exact to publish the supplied tag verbatim.
+
+  • Private packages ("private": true) are skipped during publish.
+
+  • When pnpm-lock.yaml exists, version and sync refresh it with
+    'pnpm install --lockfile-only' unless --no-lockfile-refresh is passed.
+
+  • Version creates an annotated release tag, so 'git push --follow-tags'
+    (used by publish --git-push) pushes it to the remote.
+
   • Package manager detection: Automatically detects npm, yarn, or pnpm
 
   • Lockstep versioning: All packages maintain the same version number
@@ -163,20 +179,25 @@ async function main(): Promise<void> {
       // Skip version bump if no changes since last tag
       if (!lockstep.changedSinceLastTag()) {
         console.log('No changes since last tag; skipping version bump.');
-        process.exit(0);
+        if (opts['fail-on-no-changes']) {
+          process.exitCode = 1;
+        }
+        return;
       }
 
       const skipCi = Boolean(opts.ci);
       const noGitCommit = Boolean(opts['no-git-commit']);
       const noChangelog = Boolean(opts['no-changelog']);
+      const lockfileRefresh = !Boolean(opts['no-lockfile-refresh']);
 
-      await lockstep.version({ type, skipCi, noGitCommit, noChangelog });
+      await lockstep.version({ type, skipCi, noGitCommit, noChangelog, lockfileRefresh });
 
     } else if (cmd === 'sync') {
       // Handle sync command - realign drifted packages to the highest version found
       const dryRun = Boolean(opts['dry-run']);
+      const lockfileRefresh = !Boolean(opts['no-lockfile-refresh']);
 
-      await lockstep.syncVersions({ dryRun });
+      await lockstep.syncVersions({ dryRun, lockfileRefresh });
 
     } else if (cmd === 'changelog') {
       // Handle changelog command
@@ -190,14 +211,19 @@ async function main(): Promise<void> {
       const access = opts.access === true ? 'public' : String(opts.access || 'public');
       const dry = Boolean(opts.dry);
       const tag = opts.tag === true ? '' : String(opts.tag || '');
+      const tagMode = opts['tag-mode'] === undefined ? 'branch' : String(opts['tag-mode']);
+      const preflight = Boolean(opts.preflight);
       const gitPush = Boolean(opts['git-push']);
       const provenance = Boolean(opts.provenance);
 
       if (!tag) {
         throw new Error('--tag parameter is required for publish command');
       }
+      if (tagMode !== 'branch' && tagMode !== 'exact') {
+        throw new Error('--tag-mode must be branch|exact');
+      }
 
-      await lockstep.publish({ access, dry, tag, gitPush, provenance });
+      await lockstep.publish({ access, dry, tag, tagMode, preflight, gitPush, provenance });
       
     } else {
       console.error(`Unknown command: ${cmd}`);

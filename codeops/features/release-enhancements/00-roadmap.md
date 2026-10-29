@@ -3,8 +3,8 @@
 > **Feature-Set**: Release Enhancements
 > **Status**: In Progress
 > **Created**: 2026-07-12
-> **Last Updated**: 2026-07-12 02:00
-> **Progress**: 2 / 3 RDs (67%) · 1 / 1 task
+> **Last Updated**: 2026-10-29
+> **Progress**: 2 / 3 RDs (67%) · 2 / 2 tasks
 > **CodeOps Skills Version**: 3.3.2
 
 ## Legend
@@ -19,6 +19,7 @@
 | RD-02 | npm Provenance Support | [RD-02](requirements/RD-02-npm-provenance.md) | [npm-provenance](plans/npm-provenance/00-index.md) | Done | ✅ | 2026-07-12 | Implemented + tested (36 tests) |
 | RD-03 | Non-Functional & Security | [RD-03](requirements/RD-03-non-functional.md) | — | RD Drafted | ✏️ | 2026-07-12 | Shared contract for RD-01/RD-02 |
 | T-01 | Single-package repository support | — | — | Done | ✅ | 2026-07-12 | Root-package fallback in workspace discovery so lockstep runs on single-package repos (incl. itself); 5 tests |
+| T-02 | Release hardening + OpenCode migration | — | — | Done | ✅ | 2026-10-29 | Exact dist-tags, private-package skipping, pnpm lockfile refresh, `workspace:` preservation, annotated tags, no-change guard, publish preflight; trusted publishing; `CLAUDE.md` → `AGENTS.md` |
 
 ## Notes
 
@@ -36,3 +37,9 @@
   root-package fallback to workspace discovery and fixed root-package commit attribution; 83 tests
   pass. `lockstep changelog` now runs on this repo (real AI output requires a key — present only in
   CI secrets; locally it writes fallback entries).
+- 2026-10-29: T-02 (release hardening + OpenCode migration) — implemented exact dist-tags
+  (`--tag-mode exact`), private-package skipping, pnpm lockfile refresh (`--no-lockfile-refresh`),
+  `workspace:` range preservation, annotated release tags, `--fail-on-no-changes`, and
+  `--preflight`; migrated the release workflow to npm Trusted Publishing (OIDC, no `NPM_TOKEN`);
+  replaced `CLAUDE.md` with `AGENTS.md`. 132 tests pass, type-check clean, real pnpm
+  `--frozen-lockfile` smoke test passes.

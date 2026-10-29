@@ -83,6 +83,8 @@ lockstep version --type <patch|minor|major|auto> [options]
 - `--ci` - Add [skip ci] to commit message
 - `--no-git-commit` - Skip git commit and tag operations
 - `--no-changelog` - Skip AI changelog generation during the bump
+- `--no-lockfile-refresh` - Skip refreshing `pnpm-lock.yaml` after the bump
+- `--fail-on-no-changes` - Exit with code 1 when there are no changes since the last tag
 
 **Examples:**
 ```bash
@@ -92,7 +94,15 @@ lockstep version --type major --no-git-commit
 lockstep version --type auto
 lockstep version --type auto --ci
 lockstep version --type patch --no-changelog
+lockstep version --type auto --fail-on-no-changes
 ```
+
+When `pnpm-lock.yaml` exists, `version` runs `pnpm install --lockfile-only` after rewriting the
+manifests and before creating the release commit. The command fails if that refresh fails, so a
+broken lockfile is never committed. Pass `--no-lockfile-refresh` only for unusual setups.
+
+The release tag is annotated, so `lockstep publish --git-push` (which uses `git push
+--follow-tags`) pushes it to the remote.
 
 By default a version bump also generates changelog and release-notes files and folds them into the
 release commit. See [AI Changelog & Release Notes](#ai-changelog--release-notes) below.
@@ -115,6 +125,10 @@ correctly wins over `1.9.0`.
 
 **Options:**
 - `--dry-run` - Print which packages would change; write nothing
+- `--no-lockfile-refresh` - Skip refreshing `pnpm-lock.yaml` after syncing
+
+When `pnpm-lock.yaml` exists, `sync` refreshes it with `pnpm install --lockfile-only` after
+rewriting the manifests, so the next frozen install still succeeds.
 
 **Examples:**
 ```bash
@@ -144,7 +158,8 @@ lockstep changelog --verbose
 
 ### Publish Command
 
-Publishes all packages in dependency order with branch-prefixed dist-tags.
+Publishes all public packages in dependency order. Dist-tags are branch-prefixed by default;
+use `--tag-mode exact` to publish `next`, `beta`, and other tags verbatim.
 
 ```bash
 lockstep publish --tag <dist-tag> [options]
@@ -152,20 +167,30 @@ lockstep publish --tag <dist-tag> [options]
 
 **Options:**
 - `--tag <dist-tag>` - Distribution tag for publishing (required)
+- `--tag-mode <branch|exact>` - Tag derivation mode (default: `branch`)
 - `--access <public|restricted>` - NPM access level (default: public)
 - `--dry` - Perform a dry run without publishing
+- `--preflight` - Dry-run every package before publishing any of them
 - `--git-push` - Push git changes and tags after publish
 - `--provenance` - Generate npm provenance attestations (requires supported CI)
+
+Packages with `"private": true` are skipped. Their names are logged, and they stay in the
+dependency graph so public dependents still publish in the correct order.
 
 **Examples:**
 ```bash
 lockstep publish --tag latest
-lockstep publish --tag alpha
+lockstep publish --tag next --tag-mode exact
+lockstep publish --tag beta --tag-mode exact --preflight
 lockstep publish --tag beta --dry
 lockstep publish --tag latest --access restricted
 lockstep publish --tag alpha --git-push
 lockstep publish --tag latest --provenance
 ```
+
+`--preflight` runs the package manager's dry-run publish for every package first. If any package
+fails, nothing is published. This catches packaging errors, but it does not check whether the
+version already exists in the registry.
 
 ## Automatic Version Detection
 
@@ -182,18 +207,25 @@ lockstep version --type auto
 
 ## Branch-Based Publishing
 
-Non-main branches automatically get prefixed dist-tags:
+By default, non-`latest` dist-tags are prefixed with the current branch name:
 
-- Main branches (`main`, `master`) → `latest` or specified tag
-- Feature branches → `{branch-name}-{tag}`
+- `latest` stays `latest` on every branch.
+- `next` on `main` becomes `main-next`.
+- `next` on `feature-x` becomes `feature-x-next`.
 
 ```bash
 # On main branch
-lockstep publish --tag latest    # → publishes as "latest"
+lockstep publish --tag latest                        # → publishes as "latest"
+lockstep publish --tag next                          # → publishes as "main-next"
 
-# On feature-branch
-lockstep publish --tag alpha     # → publishes as "feature-branch-alpha"
+# Publish an exact global next/beta tag instead
+lockstep publish --tag next --tag-mode exact         # → publishes as "next"
+lockstep publish --tag beta --tag-mode exact         # → publishes as "beta"
 ```
+
+Use `--tag-mode exact` when consumers should install `@scope/package@next` or `@scope/package@beta`
+directly. Branch names containing `/` cannot form a valid npm dist-tag; use exact mode for those
+branches.
 
 ## AI Changelog & Release Notes
 
@@ -306,9 +338,10 @@ await lockstep.version({
 // Realign drifted packages to the highest version found (rewrites package.json only)
 await lockstep.syncVersions({ dryRun: false });
 
-// Publish all packages
+// Publish all packages with an exact global dist-tag
 await lockstep.publish({
-  tag: 'latest',
+  tag: 'next',
+  tagMode: 'exact',
   access: 'public',
   dry: false,
   gitPush: true
@@ -317,7 +350,14 @@ await lockstep.publish({
 
 ## GitHub Actions Integration
 
-Example workflow for automated releases:
+The example below uses [npm Trusted Publishing](https://docs.npmjs.com/trusted-publishers)
+(OIDC), so no long-lived npm token is stored in the repository. Configure a trusted publisher for
+the package on npmjs.com first:
+**Packages → your package → Settings → Trusted publishing → GitHub Actions**, with the repository
+and the workflow filename that contains the publish step.
+
+Prerequisites: npm CLI 11.5.1 or later and Node.js 22.14 or later. The example uses
+`actions/setup-node@v6` with Node 24, which satisfies both.
 
 ```yaml
 name: Release
@@ -330,31 +370,47 @@ jobs:
   release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-      id-token: write   # required for npm provenance
+      contents: write   # push the release commit and tag
+      id-token: write   # npm trusted publishing (OIDC)
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
-          node-version: '20'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
 
       - run: npm install -g @blendsdk/lockstep
 
+      - name: Check for changes since last tag
+        id: changes
+        run: |
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -z "$last_tag" ] || ! git diff --quiet "$last_tag"..HEAD -- .; then
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Version packages
+        if: steps.changes.outputs.has_changes == 'true'
         run: lockstep version --type auto --ci
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Publish packages
+        if: steps.changes.outputs.has_changes == 'true'
         run: lockstep publish --tag latest --git-push --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 ```
+
+`--provenance` is optional under trusted publishing because npm generates provenance
+automatically, but lockstep uses it to validate the required `repository` fields before
+publishing. No `NODE_AUTH_TOKEN` is needed. The package's `repository` field must match the
+GitHub repository, and the workflow filename in the trusted-publisher settings must match
+exactly.
 
 ## Why Lockstep Versioning?
 

@@ -7,29 +7,34 @@ on:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # A release must not be cancelled midway through publishing.
+  cancel-in-progress: false
 
 jobs:
   release:
     name: Release
     runs-on: ubuntu-latest
     permissions:
-      contents: write
-      packages: write
-      id-token: write
+      contents: write   # push the release commit/tag and create the GitHub Release
+      id-token: write   # npm Trusted Publishing (OIDC)
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '22'
-          cache: 'npm'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
+          # npm docs recommend against caching in release builds.
+          package-manager-cache: false
+
+      - name: Use an OIDC-capable npm
+        # Trusted publishing requires npm >= 11.5.1. Pin the version declared in package.json.
+        run: npm install -g npm@12.0.1
 
       - name: Install dependencies
         run: npm ci
@@ -48,13 +53,14 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Check for changes
+      - name: Check for changes since last tag
         id: changes
         run: |
-          if git diff --quiet HEAD~1 HEAD -- .; then
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
+          last_tag=$(git describe --tags --abbrev=0 2>/dev/null || true)
+          if [ -z "$last_tag" ] || ! git diff --quiet "$last_tag"..HEAD -- .; then
             echo "has_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=false" >> $GITHUB_OUTPUT
           fi
 
       - name: Version, changelog, and tag
@@ -72,33 +78,29 @@ jobs:
         if: steps.changes.outputs.has_changes == 'true'
         run: |
           git push origin ${{ github.ref_name }}
-          git push origin --tags
+          git push origin "v${new_version}"
 
-      - name: Publish to NPM with provenance
+      - name: Publish to NPM with trusted publishing
         if: steps.changes.outputs.has_changes == 'true'
-        # lockstep publishes each package in dependency order; --provenance is honored because this
-        # runs in GitHub Actions (id-token: write) and every package declares a repository field.
+        # No NPM_TOKEN: npm exchanges the GitHub Actions OIDC token for a short-lived publish
+        # credential. Configure the trusted publisher on npmjs.com for this repository and
+        # workflow file before the first release. --provenance is optional under OIDC, but it
+        # makes lockstep validate every package's repository field before publishing.
         run: node dist/cli.js publish --tag latest --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: steps.changes.outputs.has_changes == 'true'
-        uses: actions/create-release@v1
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: v${{ env.new_version }}
-          release_name: Release v${{ env.new_version }}
-          body: |
-            ## Changes
-            
-            See [CHANGELOG.md](./CHANGELOG.md) for details.
-            
-            ## Installation
-            
-            ```bash
-            npm install -g @blendsdk/lockstep@${{ env.new_version }}
-            ```
-          draft: false
-          prerelease: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f RELEASE_NOTES.md ] && grep -q "v${new_version}" RELEASE_NOTES.md; then
+            gh release create "v${new_version}" \
+              --title "Release v${new_version}" \
+              --notes-file RELEASE_NOTES.md \
+              --verify-tag
+          else
+            gh release create "v${new_version}" \
+              --title "Release v${new_version}" \
+              --generate-notes \
+              --verify-tag
+          fi

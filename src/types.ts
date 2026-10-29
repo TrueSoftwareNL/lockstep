@@ -11,6 +11,8 @@
 export interface PackageJson {
   name: string;
   version: string;
+  /** npm refuses to publish packages marked private; lockstep skips them. */
+  private?: boolean;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
@@ -60,6 +62,10 @@ export interface PublishOptions {
   dry?: boolean;
   /** Distribution tag for publishing */
   tag: string;
+  /** How to derive the final dist-tag; defaults to "branch" */
+  tagMode?: TagMode;
+  /** Dry-run every package before publishing any of them */
+  preflight?: boolean;
   /** Whether to push git changes after publish */
   gitPush?: boolean;
   /** Enable npm provenance attestation (requires a supported CI environment) */
@@ -72,6 +78,8 @@ export interface PublishOptions {
 export interface SyncOptions {
   /** Preview which packages would change without writing any files */
   dryRun?: boolean;
+  /** Refresh pnpm-lock.yaml after rewriting package.json files; defaults to true */
+  lockfileRefresh?: boolean;
 }
 
 /**
@@ -86,6 +94,8 @@ export interface VersionOptions {
   noGitCommit?: boolean;
   /** Whether to skip AI changelog generation during the version bump */
   noChangelog?: boolean;
+  /** Refresh pnpm-lock.yaml after rewriting package.json files; defaults to true */
+  lockfileRefresh?: boolean;
 }
 
 /**
@@ -109,6 +119,15 @@ export interface LockstepConfig {
 
 /** Semantic version bump types */
 export type BumpType = 'patch' | 'minor' | 'major' | 'auto';
+
+/**
+ * How publish derives the final npm dist-tag from the supplied tag.
+ *
+ * - `branch` (default): non-`latest` tags are prefixed with the current branch, so a `next`
+ *   release from `main` becomes `main-next`.
+ * - `exact`: the supplied tag is used verbatim, so `--tag next` publishes `next`.
+ */
+export type TagMode = 'branch' | 'exact';
 
 /** Package.json dependency field names */
 export type DependencyField =

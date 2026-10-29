@@ -16,6 +16,7 @@ export type {
   CliOptions,
   LockstepConfig,
   BumpType,
+  TagMode,
   DependencyField,
   PackageManager,
   Command
