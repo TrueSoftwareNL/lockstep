@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-10-29
+
+Added:
+- Add AGENTS.md with CodeOps-managed project guidance.
+- Migrate the release workflow to np, hardening publishing with trusted publishing features.
+
+Removed:
+- Remove the Claude Code-specific CLAUDE.md.
+
+Changed:
+- Record the migration in the CodeOps roadmaps.
+- Enhance the publishing process with improvements such as exact dist-tag mode, private-package skipping, pnpm lockfile refresh, workspace range preservation, annotated tags, no-change guard, and publish preflight.
+
 ## [1.3.0] - 2026-07-15
 
 ## Added

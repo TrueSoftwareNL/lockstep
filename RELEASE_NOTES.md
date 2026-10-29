@@ -1,15 +1,13 @@
-# Release Notes — v1.3.0
+# Release Notes — v1.4.0
 
-**Released**: 2026-07-15
+**Released**: 2026-10-29
 
-Release Notes for Version 1.3.0
-
-We are excited to announce the release of version 1.3.0, which brings an important update to the @blendsdk/lockstep package. This enhancement primarily focuses on improving the efficiency of how our software manages different package versions.
-
-In this release, we've added a new command that allows users to realign any packages that might have drifted away from the highest version. What does this mean for you? Simply put, this feature helps ensure that your software is consistently operating with the most up-to-date components. By realigning these packages, you can expect better performance, increased stability, and a smoother experience overall. 
+We are excited to announce the release of version 1.4.0, which includes important updates aimed at enhancing security and improving user experience.
 
 Highlights:
 
-- **New Command for Package Management**: We’ve introduced a command that facilitates the realignment of packages, ensuring they operate at the highest available version. This improvement simplifies maintenance and helps keep your environment aligned and effective.
+- **Updated Guidance Resources**: We have replaced the existing guidance from Claude Code with improved resources from OpenCode. This change is designed to provide users with clearer, more effective guidance, ensuring that everyone can easily understand and utilize our software to its fullest potential.
 
-This release is part of our ongoing commitment to enhance your experience and provide tools that make your tasks easier and more efficient. We encourage you to take advantage of this update to keep your software running at its best. Thank you for being a valued part of our community!
+- **Enhanced Publishing Practices**: In response to feedback from our community and ongoing security assessments, we have strengthened our publishing processes. This update emphasizes trusted publishing practices, which means you can have greater confidence in the integrity and security of the content you access.
+
+These updates are part of our ongoing commitment to providing a reliable and user-friendly software experience. We believe these improvements will make it easier for everyone to navigate our tools and feel secure in their usage. We appreciate your continued support and look forward to bringing you more enhancements in future releases!
