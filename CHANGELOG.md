@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Added:
 - Add AGENTS.md with CodeOps-managed project guidance.
-- Migrate the release workflow to np, hardening publishing with trusted publishing features.
+- Migrate the release workflow to npm, hardening publishing with trusted publishing features.
 
 Removed:
 - Remove the Claude Code-specific CLAUDE.md.
