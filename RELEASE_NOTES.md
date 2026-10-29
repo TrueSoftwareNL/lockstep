@@ -1,13 +1,13 @@
-# Release Notes — v1.4.0
+# Release Notes — v1.4.1
 
 **Released**: 2026-10-29
 
-We are excited to announce the release of version 1.4.0, which includes important updates aimed at enhancing security and improving user experience.
+Version 1.4.1 of our software brings important updates that enhance the overall user experience. While this release focuses primarily on addressing some minor inconsistencies, it ensures our documentation is clearer and our processes run more smoothly.
 
-Highlights:
+Highlights of this release include:
 
-- **Updated Guidance Resources**: We have replaced the existing guidance from Claude Code with improved resources from OpenCode. This change is designed to provide users with clearer, more effective guidance, ensuring that everyone can easily understand and utilize our software to its fullest potential.
+- **Changelog Correction**: We fixed a typographical error in the changelog from version 1.4.0. This ensures that users can accurately track changes and improvements made in our software.
+  
+- **Improved Command Functionality**: We have refined some internal commands to eliminate potential issues when processing requests. This improvement may not be visible from the user’s perspective, but it contributes to the stability and reliability of the software.
 
-- **Enhanced Publishing Practices**: In response to feedback from our community and ongoing security assessments, we have strengthened our publishing processes. This update emphasizes trusted publishing practices, which means you can have greater confidence in the integrity and security of the content you access.
-
-These updates are part of our ongoing commitment to providing a reliable and user-friendly software experience. We believe these improvements will make it easier for everyone to navigate our tools and feel secure in their usage. We appreciate your continued support and look forward to bringing you more enhancements in future releases!
+These updates may seem small, but they reflect our commitment to providing a polished and professional experience for our users. By keeping our documentation flawless and ensuring our processes are efficient, we maintain a foundation that allows for more significant improvements in future releases. Thank you for using our software, and we look forward to bringing you more enhancements soon!
