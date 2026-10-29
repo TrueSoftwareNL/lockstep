@@ -2,7 +2,7 @@
 
 > **Status**: Active
 > **Last Updated**: 2026-10-29
-> **Features**: 0 / 1 done
+> **Features**: 1 / 1 done
 > **CodeOps Skills Version**: 3.3.2
 
 ## Legend
@@ -13,7 +13,7 @@
 
 | Feature | Roadmap | Stage Summary | Progress | Status | Last Updated |
 |---------|---------|---------------|----------|--------|--------------|
-| release-enhancements | [→](features/release-enhancements/00-roadmap.md) | RD-01 & RD-02 done · RD-03 shared contract · T-01/T-02 done | 2/3 RDs | 🔄 | 2026-10-29 |
+| release-enhancements | [→](features/release-enhancements/00-roadmap.md) | RD-01, RD-02, RD-03 done · T-01/T-02 done | 3/3 RDs | ✅ | 2026-10-29 |
 
 ## Archived
 
@@ -30,3 +30,6 @@ auth/RD-02`), detours, decisions.]
   skipping, pnpm lockfile refresh, `workspace:` preservation, annotated tags, no-change guard,
   preflight) plus npm Trusted Publishing migration and the `CLAUDE.md` → `AGENTS.md` OpenCode
   upgrade. See the feature roadmap notes for details.
+- 2026-10-29: `release-enhancements/RD-03` — non-functional and security contract completed:
+  shell-free git command execution, API-key redaction in provider logs, missing-SDK fallback, and
+  security regression tests. The feature set is now complete.

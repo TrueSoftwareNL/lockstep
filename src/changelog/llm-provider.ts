@@ -95,7 +95,12 @@ export class LLMProvider {
             try {
                 return await this.callOpenAI(systemPrompt, userPrompt, maxTokens, timeout);
             } catch (error) {
-                console.warn(`OpenAI generation failed, trying Anthropic: ${message(error)}`);
+                console.warn(
+                    `OpenAI generation failed, trying Anthropic: ${redactSecrets(
+                        message(error),
+                        this.config.openaiApiKey
+                    )}`
+                );
             }
         }
 
@@ -103,7 +108,12 @@ export class LLMProvider {
             try {
                 return await this.callAnthropic(systemPrompt, userPrompt, maxTokens, timeout);
             } catch (error) {
-                console.warn(`Anthropic generation failed: ${message(error)}`);
+                console.warn(
+                    `Anthropic generation failed: ${redactSecrets(
+                        message(error),
+                        this.config.anthropicApiKey
+                    )}`
+                );
             }
         }
 
@@ -175,4 +185,22 @@ export class LLMProvider {
 /** Extracts a readable message from an unknown error. */
 function message(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Replaces configured secret values in text before it is logged.
+ *
+ * Provider errors normally do not echo credentials, but the tool must not rely on that. Any
+ * configured API key found in an error message is replaced with `[REDACTED]`.
+ *
+ * @param text - Text that may contain a secret
+ * @param secrets - Secret values to redact; empty values are ignored
+ * @returns The text with every exact secret occurrence replaced
+ */
+function redactSecrets(text: string, ...secrets: Array<string | undefined>): string {
+    let redacted = text;
+    for (const secret of secrets) {
+        if (secret) redacted = redacted.split(secret).join('[REDACTED]');
+    }
+    return redacted;
 }

@@ -1,10 +1,10 @@
 # Roadmap: Release Enhancements
 
 > **Feature-Set**: Release Enhancements
-> **Status**: In Progress
+> **Status**: Done
 > **Created**: 2026-07-12
 > **Last Updated**: 2026-10-29
-> **Progress**: 2 / 3 RDs (67%) · 2 / 2 tasks
+> **Progress**: 3 / 3 RDs (100%) · 2 / 2 tasks
 > **CodeOps Skills Version**: 3.3.2
 
 ## Legend
@@ -17,7 +17,7 @@
 |----|-------|----|------|-------|--------|--------------|-----------------|
 | RD-01 | AI-Based Changelog & Release Notes | [RD-01](requirements/RD-01-ai-changelog.md) | [ai-changelog](plans/ai-changelog/00-index.md) | Done | ✅ | 2026-07-12 | Implemented + tested (26 tasks, 78 tests) |
 | RD-02 | npm Provenance Support | [RD-02](requirements/RD-02-npm-provenance.md) | [npm-provenance](plans/npm-provenance/00-index.md) | Done | ✅ | 2026-07-12 | Implemented + tested (36 tests) |
-| RD-03 | Non-Functional & Security | [RD-03](requirements/RD-03-non-functional.md) | — | RD Drafted | ✏️ | 2026-07-12 | Shared contract for RD-01/RD-02 |
+| RD-03 | Non-Functional & Security | [RD-03](requirements/RD-03-non-functional.md) | — | Done | ✅ | 2026-10-29 | Shell-free git commands, secret redaction, missing-SDK fallback; security tests added |
 | T-01 | Single-package repository support | — | — | Done | ✅ | 2026-07-12 | Root-package fallback in workspace discovery so lockstep runs on single-package repos (incl. itself); 5 tests |
 | T-02 | Release hardening + OpenCode migration | — | — | Done | ✅ | 2026-10-29 | Exact dist-tags, private-package skipping, pnpm lockfile refresh, `workspace:` preservation, annotated tags, no-change guard, publish preflight; trusted publishing; `CLAUDE.md` → `AGENTS.md` |
 
@@ -43,3 +43,9 @@
   `--preflight`; migrated the release workflow to npm Trusted Publishing (OIDC, no `NPM_TOKEN`);
   replaced `CLAUDE.md` with `AGENTS.md`. 132 tests pass, type-check clean, real pnpm
   `--frozen-lockfile` smoke test passes.
+- 2026-10-29: RD-03 (non-functional & security) — completed the injection-prevention and
+  secret-handling contract. Git commands now run through `execFileSync` argument vectors instead
+  of shell strings, so repository tag names cannot execute shell syntax; provider error logs
+  redact configured API keys; missing optional SDKs and provider failures route to the fallback.
+  Added a malicious-tag security test and secret-log/commit tests. 137 tests pass, type-check
+  clean.

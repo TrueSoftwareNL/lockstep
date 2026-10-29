@@ -5,7 +5,7 @@
  * @license MIT
  */
 
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { buildPackageChangeSummary } from "./changelog/change-detection.js";
@@ -80,15 +80,17 @@ function exists(p: string): boolean {
 }
 
 /**
- * Executes a git command in the given working directory and returns the output.
- * The `cwd` is passed explicitly so operations always target the configured repository
- * root rather than whatever directory the process happens to be launched from.
- * @param cmd - Git command to execute (without 'git' prefix)
+ * Runs a git command in the given working directory and returns the output.
+ *
+ * The command is passed as an argument vector and executed without a shell, so repository data
+ * such as tag names can never be interpreted as shell syntax.
+ *
+ * @param args - Git arguments, without the leading "git"
  * @param cwd - Working directory the command runs in
  * @returns Command output as trimmed string
  */
-function git(cmd: string, cwd: string): string {
-    return execSync(`git ${cmd}`, { cwd, stdio: "pipe" }).toString().trim();
+function git(args: string[], cwd: string): string {
+    return execFileSync("git", args, { cwd, stdio: "pipe" }).toString().trim();
 }
 
 /**
@@ -455,13 +457,13 @@ export class Lockstep {
     changedSinceLastTag(): boolean {
         let lastTag = "";
         try {
-            lastTag = git("describe --tags --abbrev=0", this.config.root);
+            lastTag = git(["describe", "--tags", "--abbrev=0"], this.config.root);
         } catch {
             // No tags exist, assume changes
             return true;
         }
 
-        const diff = execSync(`git diff --name-only ${lastTag}..HEAD`, { cwd: this.config.root, stdio: "pipe" }).toString();
+        const diff = git(["diff", "--name-only", `${lastTag}..HEAD`], this.config.root);
         return diff.split("\n").some(Boolean);
     }
 
@@ -472,7 +474,7 @@ export class Lockstep {
     determineVersionType(): Exclude<BumpType, "auto"> {
         let lastTag = "";
         try {
-            lastTag = git("describe --tags --abbrev=0", this.config.root);
+            lastTag = git(["describe", "--tags", "--abbrev=0"], this.config.root);
         } catch {
             // No tags exist, default to patch
             console.log("No previous tags found, defaulting to patch version bump");
@@ -482,7 +484,7 @@ export class Lockstep {
         // Get commit messages since last tag
         let commits: string;
         try {
-            commits = git(`log ${lastTag}..HEAD --pretty=format:"%s"`, this.config.root);
+            commits = git(["log", `${lastTag}..HEAD`, "--pretty=format:%s"], this.config.root);
         } catch {
             console.log("Unable to get commit history, defaulting to patch version bump");
             return "patch";
@@ -622,11 +624,14 @@ export class Lockstep {
 
         // Perform git operations unless explicitly skipped
         if (!noGitCommit) {
-            execSync(`git add .`, { cwd: this.config.root, stdio: "inherit" });
+            execFileSync("git", ["add", "."], { cwd: this.config.root, stdio: "inherit" });
             const commitMessage = `chore(release): v${next}${skipCi ? " [skip ci]" : ""}`;
-            execSync(`git commit -m "${commitMessage}"`, { cwd: this.config.root, stdio: "inherit" });
+            execFileSync("git", ["commit", "-m", commitMessage], { cwd: this.config.root, stdio: "inherit" });
             // Annotated tags are required for `git push --follow-tags` to push the release tag.
-            execSync(`git tag -a v${next} -m "v${next}"`, { cwd: this.config.root, stdio: "inherit" });
+            execFileSync("git", ["tag", "-a", `v${next}`, "-m", `v${next}`], {
+                cwd: this.config.root,
+                stdio: "inherit"
+            });
 
             console.log(`\nAll packages bumped to v${next} and tagged.`);
         } else {
@@ -813,7 +818,7 @@ export class Lockstep {
             );
         }
 
-        const currentBranch = git("rev-parse --abbrev-ref HEAD", this.config.root);
+        const currentBranch = git(["rev-parse", "--abbrev-ref", "HEAD"], this.config.root);
         if (tagMode === "branch" && tag !== "latest" && currentBranch === "HEAD") {
             throw new Error(
                 "Cannot derive a branch-prefixed dist-tag in detached HEAD. Use --tag-mode exact."
@@ -859,7 +864,7 @@ export class Lockstep {
         // Push git changes and tags if requested (and not in dry run)
         if (gitPush && !dry) {
             console.log("\nPushing git changes and tags...");
-            execSync("git push --follow-tags", { cwd: this.config.root, stdio: "inherit" });
+            execFileSync("git", ["push", "--follow-tags"], { cwd: this.config.root, stdio: "inherit" });
             console.log("✔ Git changes and tags pushed to remote");
         }
     }

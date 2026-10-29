@@ -112,6 +112,21 @@ describe('Lockstep.changelog', () => {
             else process.env.OPENAI_API_KEY = prev;
         }
     });
+
+    it('should never write an API key into the release commit', async () => {
+        const dir = makeRepo();
+        const secret = 'sk-SENTINEL-commit-should-not-leak';
+        const prev = process.env.OPENAI_API_KEY;
+        process.env.OPENAI_API_KEY = secret;
+        try {
+            await new StubLockstep(dir, new StubProvider(aiResult)).version({ type: 'patch' });
+            const committed = execSync('git show HEAD', { cwd: dir }).toString();
+            expect(committed).not.toContain(secret);
+        } finally {
+            if (prev === undefined) delete process.env.OPENAI_API_KEY;
+            else process.env.OPENAI_API_KEY = prev;
+        }
+    });
 });
 
 /** Lockstep whose changelog step always throws, to prove version() tolerates it. */

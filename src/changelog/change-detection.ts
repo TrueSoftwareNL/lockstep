@@ -10,7 +10,7 @@
  * @license MIT
  */
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import type { ParsedCommit, PackageChangeSummary } from './types.js';
 import type { WorkspacePackage } from '../types.js';
@@ -21,12 +21,16 @@ const RECORD_SEP = '<<--LS-CL-RECORD-->>';
 
 /**
  * Runs a git command in a directory and returns its trimmed output.
- * @param cmd - The git subcommand (without the `git` prefix)
+ *
+ * Arguments are passed as a vector and executed without a shell, so tag names or commit metadata
+ * cannot be interpreted as shell syntax.
+ *
+ * @param args - Git arguments, without the leading `git`
  * @param cwd - Directory to run in
  * @returns Trimmed stdout
  */
-function runGit(cmd: string, cwd: string): string {
-    return execSync(`git ${cmd}`, { cwd, stdio: 'pipe' }).toString().trim();
+function runGit(args: string[], cwd: string): string {
+    return execFileSync('git', args, { cwd, stdio: 'pipe' }).toString().trim();
 }
 
 /**
@@ -40,12 +44,12 @@ function runGit(cmd: string, cwd: string): string {
  */
 export function getLastReleaseRef(cwd: string = process.cwd()): string {
     try {
-        const tag = runGit('describe --tags --abbrev=0', cwd);
+        const tag = runGit(['describe', '--tags', '--abbrev=0'], cwd);
         if (tag) return tag;
     } catch {
         // No tags — fall through to bootstrap.
     }
-    return runGit('rev-list --max-parents=0 HEAD', cwd).split('\n')[0]!.trim();
+    return runGit(['rev-list', '--max-parents=0', 'HEAD'], cwd).split('\n')[0]!.trim();
 }
 
 /**
@@ -56,7 +60,7 @@ export function getLastReleaseRef(cwd: string = process.cwd()): string {
  */
 export function getChangedFiles(lastRef: string, cwd: string = process.cwd()): string[] {
     try {
-        const out = runGit(`diff --name-only ${lastRef}..HEAD`, cwd);
+        const out = runGit(['diff', '--name-only', `${lastRef}..HEAD`], cwd);
         return out.split('\n').map(f => f.trim()).filter(f => f.length > 0);
     } catch {
         return [];
@@ -92,7 +96,7 @@ export function getCommitsSinceRef(lastRef: string, cwd: string = process.cwd())
     let raw: string;
     try {
         const format = `%h${FIELD_SEP}%s${FIELD_SEP}%b${RECORD_SEP}`;
-        raw = runGit(`log ${lastRef}..HEAD --pretty=format:"${format}"`, cwd);
+        raw = runGit(['log', `${lastRef}..HEAD`, `--pretty=format:${format}`], cwd);
     } catch {
         return [];
     }
@@ -108,7 +112,7 @@ export function getCommitsSinceRef(lastRef: string, cwd: string = process.cwd())
 
         let files: string[] = [];
         try {
-            files = runGit(`diff-tree --no-commit-id --name-only -r ${hash}`, cwd)
+            files = runGit(['diff-tree', '--no-commit-id', '--name-only', '-r', hash], cwd)
                 .split('\n').map(f => f.trim()).filter(f => f.length > 0);
         } catch {
             // Leave files empty if the diff-tree read fails.

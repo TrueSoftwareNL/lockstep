@@ -83,6 +83,34 @@ describe('generate', () => {
         await expect(p.generate('sys', 'user')).resolves.toBeNull();
     });
 
+    it('should route a missing optional SDK to the fallback instead of crashing', async () => {
+        const p = new StubProvider(config({ openaiApiKey: 'x', anthropicApiKey: 'y' }));
+        p.openai = new Error("Cannot find module 'openai'");
+        p.anthropic = new Error("Cannot find module '@anthropic-ai/sdk'");
+        await expect(p.generate('sys', 'user')).resolves.toBeNull();
+    });
+
+    it('should redact configured API keys from provider error logs', async () => {
+        const secret = 'sk-SENTINEL-should-not-leak';
+        const p = new StubProvider(config({ openaiApiKey: secret, anthropicApiKey: secret }));
+        p.openai = new Error(`auth failed for ${secret}`);
+        p.anthropic = new Error(`auth failed for ${secret}`);
+
+        const logs: string[] = [];
+        const originalWarn = console.warn;
+        console.warn = (...args: unknown[]) => {
+            logs.push(args.map(String).join(' '));
+        };
+        try {
+            await p.generate('sys', 'user');
+        } finally {
+            console.warn = originalWarn;
+        }
+
+        expect(logs.join('\n')).not.toContain(secret);
+        expect(logs.join('\n')).toContain('[REDACTED]');
+    });
+
     it('should return null when no keys are configured', async () => {
         const p = new StubProvider(config());
         await expect(p.generate('sys', 'user')).resolves.toBeNull();
